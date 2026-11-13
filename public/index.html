@@ -257,7 +257,7 @@
           <input id="cMonk" type="text" autocomplete="off">
         </label>
         <fieldset>
-          <label class="radio"><input type="radio" name="cType" value="audio" checked> 🎧 Audio (49kbps m4a · ~22 MB/hr)</label>
+          <label class="radio"><input type="radio" name="cType" value="audio" checked> 🎧 Audio (16 kbps Opus · ~7 MB/hr)</label>
           <label class="radio"><input type="radio" name="cType" value="video"> 🎬 Video (360p mp4 · ~250 MB/hr)</label>
         </fieldset>
         <button id="cAddBtn" class="btn">➕ Catalog သို့ ထည့်မည်</button>
@@ -374,8 +374,10 @@
 // Put your backend URL here (or set it in #admin → Server). '' = same server that serves this page.
 // On Vercel (no yt-dlp there) the page uses the VPS backend; everywhere else the same server.
 var DEFAULT_API = /\.vercel\.app$/.test(location.hostname) ? 'https://150.95.27.200.sslip.io' : '';
-var CHUNK = 1024 * 1024;       // downloads are saved in 1 MB pieces -> RAM never holds the whole file,
-                               // and a dropped connection on slow mobile data loses at most 1 MB
+var CHUNK = 256 * 1024;        // downloads are saved in 256 KB pieces -> RAM never holds the whole file,
+                               // a dropped connection loses at most 256 KB, and playback can start after the
+                               // first piece (≈ 2 minutes of 16 kbps audio)
+var STREAM_MIME = 'audio/webm; codecs="opus"';   // what the server makes for audio talks
 var STALL_MS = 30000;          // no bytes for this long = dead connection (mobile networks often hang silently)
 
 var T = {
@@ -417,6 +419,8 @@ var T = {
   confirmDel: 'ဤတရားကို ဖုန်းထဲမှ ဖျက်မှာ သေချာပါသလား?',
   srcLocal: '📱 ဖုန်းထဲမှ (Offline)',
   srcYT: '🌐 YouTube မှ (Online)',
+  srcStream: '⬇ ဒေါင်းရင်း ဖွင့်နေသည်',
+  streamWait: '⏳ ဖွင့်ရန် ပြင်ဆင်နေသည်… ခဏစောင့်ပါ',
   switched: 'အင်တာနက် ပြတ်သွားသဖြင့် ဖုန်းထဲက ဖိုင်ဖြင့် ဆက်ဖွင့်နေသည်',
   switchedReady: 'ဖုန်းထဲ သိမ်းပြီးပါပြီ — ဖုန်းထဲက ဖိုင်ဖြင့် ဆက်ဖွင့်နေသည်',
   notCached: 'ဤတရားကို ဖုန်းထဲ မသိမ်းရသေးပါ။ အင်တာနက် ပြန်ရမှ ဖွင့်နိုင်မည်။',
@@ -536,6 +540,7 @@ function getTrack(id) { return txn('tracks', 'readonly', function (b, t, s) { s.
 function allTracks() { return txn('tracks', 'readonly', function (b, t, s) { s.getAll().onsuccess = function (e) { b.v = e.target.result; }; }); }
 function putTrack(tr) { return txn('tracks', 'readwrite', function (b, t, s) { s.put(tr); }); }
 function getChunks(id) { return txn('chunks', 'readonly', function (b, t, s) { s.getAll(chunkRange(id)).onsuccess = function (e) { b.v = e.target.result; }; }); }
+function getChunk(id, n) { return txn('chunks', 'readonly', function (b, t, s) { s.get([id, n]).onsuccess = function (e) { b.v = e.target.result; }; }); }
 function delChunks(id) { return txn('chunks', 'readwrite', function (b, t, s) { s.delete(chunkRange(id)); }); }
 function deleteTrack(id) {
   return txn(['tracks', 'chunks'], 'readwrite', function (b, t, ts, cs) { ts.delete(id); cs.delete(chunkRange(id)); });
@@ -670,7 +675,8 @@ function showStorage() {
 
 /* ===================== Player ===================== */
 var audioEl = $('#audio'), videoEl = $('#video');
-var P = { id: null, mode: null, el: null, url: null, yt: null, ytTimer: 0, ytLast: 0, token: 0, waitCache: false, lastSave: 0, lastSec: -1 };
+var P = { id: null, mode: null, el: null, url: null, yt: null, ytTimer: 0, ytLast: 0, token: 0, waitCache: false, lastSave: 0, lastSec: -1,
+          waitStream: 0, streaming: false };
 
 // Bottom sheet height -> page padding + toast position (so nothing hides behind the player)
 function setPh() {
@@ -725,6 +731,7 @@ function stopCurrent(save) {
   }
   if (P.url) { URL.revokeObjectURL(P.url); P.url = null; }
   P.mode = null; P.el = null; P.waitCache = false;
+  P.waitStream = 0; P.streaming = false; FEED = null;
 }
 
 function loadTrack(id, autoplay) {
@@ -736,13 +743,110 @@ function loadTrack(id, autoplay) {
     showNP(tr); updateUI();
     if (tr.cached) return playLocal(tr, tr.position || 0, autoplay !== false, token);
     if (tr.source === 'youtube') {
-      if (navigator.onLine) return playYT(tr, tr.position || 0, token);
-      toast(T.notCached);
+      if (!navigator.onLine) { toast(T.notCached); return; }
+      // Video can only be watched on YouTube until it is saved. Audio never uses YouTube:
+      // it plays from the pieces already on the phone, so the weak line carries one download only.
+      if (tr.kind === 'video') return playYT(tr, tr.position || 0, token);
+      return playStream(tr, token);
     }
   });
 }
 
-function playLocal(tr, at, autoplay, token) {
+/* ---------- Audio: play while it downloads (one download, no second stream) ----------
+   The downloader saves 256 KB pieces to IndexedDB; a MediaSource feeds them to <audio> as they arrive.
+   When the download finishes, playback hands over to the normal phone copy at the same second. */
+var FEED = null;   // { id, ms, sb, next, busy }
+function canStream() {
+  return !!(window.MediaSource && MediaSource.isTypeSupported && MediaSource.isTypeSupported(STREAM_MIME));
+}
+function playStream(tr, token) {
+  P.waitCache = true;              // fallback: play the phone copy as soon as the download finishes
+  P.waitStream = token;
+  enqueue(tr.id, true);            // this talk downloads first
+  $('#npSrc').textContent = T.streamWait; $('#npSrc').hidden = false; showDl();
+  updateUI();
+  return tryStream(tr.id);
+}
+// Called on tap and by the downloader after each saved piece: start once the first piece is on the phone.
+function tryStream(id) {
+  if (P.id !== id || !P.waitStream || P.mode) return Promise.resolve();
+  var token = P.waitStream;
+  return Promise.all([getTrack(id), getChunk(id, 0)]).then(function (r) {
+    var tr = r[0], first = r[1];
+    if (token !== P.token || P.waitStream !== token || P.mode || !tr) return;
+    if (tr.cached) { P.waitStream = 0; return playLocal(tr, tr.position || 0, true, token); }
+    if (!tr.srvMime || !first) return;                         // server file / first piece not ready yet
+    P.waitStream = 0;
+    if (!/webm/.test(tr.srvMime) || !canStream()) return;      // older m4a file: plays when fully saved (waitCache)
+    startFeed(tr, token);
+  }).catch(function () {});
+}
+function startFeed(tr, token) {
+  var el = audioEl, ms = new MediaSource(), at = tr.position || 0;
+  var f = FEED = { id: tr.id, ms: ms, sb: null, next: 0, busy: false };
+  if (P.url) URL.revokeObjectURL(P.url);
+  P.url = URL.createObjectURL(ms);
+  if (videoEl.getAttribute('src')) { videoEl.pause(); videoEl.removeAttribute('src'); videoEl.load(); }
+  videoEl.hidden = true;
+  P.mode = 'media'; P.el = el; P.lastSec = -1; P.streaming = true;
+  $('#npSrc').textContent = T.srcStream; $('#npSrc').hidden = false; showDl();
+  ms.addEventListener('sourceopen', function () {
+    if (FEED !== f) return;
+    try { f.sb = ms.addSourceBuffer(STREAM_MIME); }
+    catch (e) { stopCurrent(false); P.waitCache = true; updateUI(); return; }   // plays when fully saved
+    f.sb.addEventListener('updateend', feedPump);
+    feedPump();
+  }, { once: true });
+  el.addEventListener('loadedmetadata', function () {
+    if (FEED !== f || token !== P.token) return;
+    if (at > 3 && (!isFinite(el.duration) || at < el.duration - 3)) { el.currentTime = at; toast(fmt(at) + T.resumeAt); }
+    el.play().catch(function () { updateUI(); });
+    updateUI(); updateTime();
+  }, { once: true });
+  el.src = P.url;
+  updateUI();
+}
+function feedPump() {
+  var f = FEED;
+  if (!f || f.busy || !f.sb || f.sb.updating || f.ms.readyState !== 'open') return;
+  f.busy = true;
+  getChunk(f.id, f.next).then(function (c) {
+    if (FEED !== f) return;
+    if (!c) { f.busy = false; return; }                        // not downloaded yet: the downloader calls again
+    return c.blob.arrayBuffer().then(function (buf) {
+      f.busy = false;
+      if (FEED !== f || f.ms.readyState !== 'open' || f.sb.updating) return;
+      try { f.sb.appendBuffer(buf); f.next++; }                // 'updateend' pumps the next piece
+      catch (e) {
+        if (e.name !== 'QuotaExceededError') return;
+        var t = P.el.currentTime;                              // very long talk: drop what was already heard
+        if (t > 90) f.sb.remove(0, t - 60); else setTimeout(feedPump, 5000);
+      }
+    });
+  }).catch(function () { f.busy = false; });
+}
+// Downloader hook: a new piece (or the server's file type) is saved for this talk.
+function onPieceSaved(id) {
+  if (P.id !== id) return;
+  if (FEED && FEED.id === id) feedPump();
+  else if (P.waitStream) tryStream(id);
+}
+// The saved pieces are being thrown away (server lost the job): stop feeding them, wait for the new ones.
+function restartStream(id) {
+  if (P.id !== id || !P.streaming) return;
+  stopCurrent(true);
+  P.waitCache = true; P.waitStream = P.token;
+  $('#npSrc').textContent = T.streamWait; $('#npSrc').hidden = false; updateUI();
+}
+// Download finished while streaming: continue from the normal phone copy at the same second.
+function streamToLocal(id) {
+  var el = P.el, t = el.currentTime, was = !el.paused, token = ++P.token;
+  stopCurrent(true);
+  P.id = id;
+  return getTrack(id).then(function (tr) { if (tr && token === P.token) return playLocal(tr, t, was, token, true); });
+}
+
+function playLocal(tr, at, autoplay, token, quiet) {
   token = token || ++P.token;
   return getChunks(tr.id).then(function (chunks) {
     if (token !== P.token) return;
@@ -767,7 +871,7 @@ function playLocal(tr, at, autoplay, token) {
       if (token !== P.token) return;
       if (isFinite(el.duration) && el.duration > 0) {
         if (!tr.duration) patch(tr.id, { duration: el.duration });
-        if (at > 3 && at < el.duration - 3) { el.currentTime = at; toast(fmt(at) + T.resumeAt); }
+        if (at > 3 && at < el.duration - 3) { el.currentTime = at; if (!quiet) toast(fmt(at) + T.resumeAt); }
       }
       if (autoplay) el.play().catch(function () { updateUI(); });
       updateUI(); updateTime();
@@ -881,7 +985,10 @@ function isPlaying() {
 }
 function curTime() { return P.mode === 'media' ? P.el.currentTime : P.mode === 'yt' ? P.ytLast : 0; }
 function duration() {
-  if (P.mode === 'media') return isFinite(P.el.duration) ? P.el.duration : 0;
+  if (P.mode === 'media') {
+    if (isFinite(P.el.duration) && P.el.duration > 0) return P.el.duration;
+    return (findTrack(P.id) || {}).duration || 0;           // still streaming: length from the server listing
+  }
   if (P.mode === 'yt') { try { return P.yt.getDuration() || 0; } catch (e) { return 0; } }
   return 0;
 }
@@ -945,7 +1052,7 @@ function updateTime() {
 var DL = { queue: [], running: null, ctrl: null, cancel: false, requeue: null, tries: {} };
 
 // urgent = grandma just tapped this talk: put it first. A running download is paused (not parallel!)
-// and goes back into the queue; it later resumes from its last saved 1 MB piece.
+// and goes back into the queue; it later resumes from its last saved piece.
 function enqueue(id, urgent) {
   if (DL.running === id) return;
   var i = DL.queue.indexOf(id);
@@ -1013,7 +1120,7 @@ async function cacheYouTube(id) {
   // 1) Make sure the server has (or is making) the file.
   var job = dl.jobId ? await getJob(dl.jobId) : null;
   if (!job) {
-    if (dl.bytes || dl.n) await delChunks(id);               // old partial data belongs to a lost job
+    if (dl.bytes || dl.n) { restartStream(id); await delChunks(id); }   // old partial data belongs to a lost job
     var r = await fetchT(api + '/api/prepare', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: 'https://www.youtube.com/watch?v=' + tr.ytId, type: tr.kind })
@@ -1037,7 +1144,11 @@ async function cacheYouTube(id) {
     if (!job) throw new Error('job lost');
   }
 
-  // 3) Stream to IndexedDB in 1 MB pieces, resuming from the last saved byte.
+  // The server's file type decides whether the phone can play it while downloading (WebM/Opus).
+  if (job.mime && tr.srvMime !== job.mime) { tr.srvMime = job.mime; await patch(id, { srvMime: job.mime }); }
+  onPieceSaved(id);
+
+  // 3) Stream to IndexedDB in 256 KB pieces, resuming from the last saved byte.
   var mime = job.mime || tr.mime;
   var total = job.size || 0;
   if (!(total && dl.bytes >= total)) {
@@ -1054,7 +1165,7 @@ async function cacheYouTube(id) {
       if (res.status === 404) { await patch(id, { dl: { jobId: null, bytes: 0, n: 0 } }); throw new Error('file expired'); }
       if (!res.ok) throw new Error('download ' + res.status);
       if (dl.bytes > 0 && res.status !== 206) {                 // server ignored Range -> start over
-        await delChunks(id); dl.bytes = 0; dl.n = 0;
+        restartStream(id); await delChunks(id); dl.bytes = 0; dl.n = 0;
       }
       if (!total) total = dl.bytes + Number(res.headers.get('Content-Length') || 0);
 
@@ -1071,12 +1182,13 @@ async function cacheYouTube(id) {
           bytes += partLen; n++;
           parts = []; partLen = 0;                              // drop the RAM buffer right away
           DL.progressed = true;
+          onPieceSaved(id);
         }
         // Show progress from bytes received (not only saved), so slow lines never look frozen.
         var got = bytes + partLen, pct = total ? Math.floor(got * 100 / total) : 0;
         if (pct !== lastPct) { lastPct = pct; setDl(id, T.saving + ' ' + pct + '%', false, mb(got) + ' / ' + mb(total) + ' MB'); }
       }
-      if (partLen) { await saveChunk(id, n, new Blob(parts), bytes + partLen); bytes += partLen; DL.progressed = true; }
+      if (partLen) { await saveChunk(id, n, new Blob(parts), bytes + partLen); bytes += partLen; DL.progressed = true; onPieceSaved(id); }
       parts = null; reader = null; res = null;
       if (total && bytes < total) throw new Error('incomplete');
     } catch (e) {
@@ -1094,6 +1206,7 @@ async function cacheYouTube(id) {
   toast((findTrack(id) || {}).title + ' — ' + T.cachedToast);
   if (P.id === id) {
     if (P.mode === 'yt') switchYTtoLocal('ready');                  // lighter: drop the iframe
+    else if (P.streaming) streamToLocal(id);                         // MediaSource -> normal phone copy
     else if (!P.mode && P.waitCache) { var t2 = await getTrack(id); playLocal(t2, t2.position || 0, true); }
   }
 }
@@ -1144,7 +1257,7 @@ function fetchThumb(id, vid) {   // ~4 KB jpeg stored as data URL so it shows of
 
 /* ===================== Suggested talks (online only) =====================
    Only metadata is fetched. Nothing is downloaded until grandma taps a talk:
-   then it streams immediately (YouTube) AND goes first in the one-at-a-time download queue. */
+   then it plays from the pieces already on the phone AND goes first in the one-at-a-time download queue. */
 var SUG = { items: [], loading: false, last: 0, key: '' };
 var SUG_MAX = 16;
 
@@ -1200,7 +1313,7 @@ async function playSuggestion(vid) {
   if (!x) return;
   var card = document.querySelector('#sugList [data-sug="' + CSS.escape(vid) + '"]');   // instant feedback
   if (card) { card.parentNode.classList.add('busy'); card.querySelector('.pill').textContent = T.opening; }
-  var id = 'yt-' + vid + '-audio';                          // audio only: ~22 MB/hour on the phone
+  var id = 'yt-' + vid + '-audio';                          // audio only: ~7 MB/hour on the phone
   var tr = await getTrack(id);
   if (!tr) {
     tr = { id: id, source: 'youtube', ytId: vid, kind: 'audio', title: x.title || 'YouTube', monk: x.channel || '',
@@ -1210,7 +1323,7 @@ async function playSuggestion(vid) {
   await refresh();                                          // moves it into "Saved" with a download badge
   if (!tr.cached) enqueue(id, true);                        // download this one first
   requestPersist();
-  await loadTrack(id, true);                                // streams now; switches to the phone copy when saved
+  await loadTrack(id, true);                                // plays while downloading; then the phone copy
   fetchThumb(id, vid);
 }
 

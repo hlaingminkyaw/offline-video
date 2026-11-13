@@ -33,12 +33,12 @@ Grandma never pastes links. Her screen shows only large talk cards, each with a 
 
 1. Open the app URL with **`#admin`** at the end, e.g. `https://<your-app>.onrender.com/#admin`. On her phone you can also tap the **⚙** in the top corner **5 times quickly**.
 2. Enter the **Admin PIN**, which is the server's `ADMIN_PIN`.
-3. Paste a YouTube link and choose **🎧 Audio (49 kbps m4a)** or **🎬 Video (360p mp4)**.
+3. Paste a YouTube link and choose **🎧 Audio (16 kbps Opus, ~7 MB/hour)** or **🎬 Video (360p mp4)**.
    - Leave the title empty and the server fills it in with `yt-dlp --get-title`.
    - Leave the monk empty and the server uses the YouTube channel name.
 4. Tap **➕ Catalog သို့ ထည့်မည်**. The server starts preparing the file straight away.
 
-Her phone fetches `/api/catalog` each time the app opens, when the internet comes back, and when the app returns to the screen (at most every 5 minutes). New talks are queued and downloaded **strictly one at a time**, each in 1 MB pieces that are released after saving.
+Her phone fetches `/api/catalog` each time the app opens, when the internet comes back, and when the app returns to the screen (at most every 5 minutes). New talks are queued and downloaded **strictly one at a time**, each in 256 KB pieces that are released after saving.
 
 **When you remove a talk from the catalog:**
 - If it is already on her phone, it is **kept** and stays playable. It is marked *(Catalog မှ ဖယ်ထားသည်)*, but only in the admin view.
@@ -70,8 +70,8 @@ When the phone is online, her main screen has two sections:
 2. **✨ နားထောင်ရန် အကြံပြုချက်များ (Suggested Talks):** shown only while online. It lists up to 16 new talks from your trusted sources, skipping anything already on the phone.
 
 **Nothing in the suggestions is downloaded until she taps one.** On a tap:
-- It starts streaming from YouTube straight away.
-- Its audio (~22 MB/hour) goes to the **front** of the download queue. If a catalog download is running, it is paused and later resumes from its last saved 1 MB piece, so there is still only one download at a time.
+- Its audio (~7 MB/hour) goes to the **front** of the download queue. If a catalog download is running, it is paused and later resumes from its last saved piece, so there is still only one download at a time.
+- It starts playing as soon as the first piece is on the phone (usually 10–30 seconds), from the downloaded pieces themselves. YouTube is not used for audio, so a weak mobile line carries only this one download.
 - When the download finishes, playback switches to the phone copy at the same second, and the talk moves into *Saved Offline* for good.
 
 **Managing sources** (in `#admin`, under *✨ Suggestion sources*):
@@ -102,12 +102,13 @@ When the phone is online, her main screen has two sections:
 | Situation | What plays |
 |---|---|
 | Track already saved on the phone | Local file from IndexedDB in a plain `<audio>`/`<video>` (online or offline) |
-| Catalog talk not downloaded yet, online | YouTube iframe right away, while the phone keeps downloading it in the background |
-| Download finishes while YouTube is playing | Iframe is destroyed; the local file continues from the same second |
-| Internet drops while YouTube is playing | Iframe is removed at once; the local file continues from the same second (if not saved yet, it shows a message and resumes saving when back online) |
+| Audio talk not downloaded yet, online | Plays the pieces already saved (MediaSource) while the download continues; no second stream |
+| Download finishes while that talk is playing | Switches to the normal saved copy at the same second |
+| Internet drops while it is playing | Keeps playing what is already saved; the download resumes when the internet is back |
+| Video talk not downloaded yet, online | YouTube iframe (video cannot play from partial pieces); switches to the local file when saved |
 
 Steps taken to keep memory low:
-- Downloads are streamed and written to IndexedDB in **1 MB pieces**, so the whole file is never held in RAM. Each buffer is released right after it is saved.
+- Downloads are streamed and written to IndexedDB in **256 KB pieces**, so the whole file is never held in RAM. Each buffer is released right after it is saved.
 - For playback, the pieces are joined with `new Blob([...pieces])`. Chrome keeps IndexedDB blobs on disk, so this does not copy the file into memory.
 - The previous blob URL is always released with `URL.revokeObjectURL()`, and the media element is reset with `removeAttribute('src')` + `load()` to free its decoder buffers.
 - The YouTube script is loaded only when needed, never offline.
@@ -165,7 +166,7 @@ Upload `public/`. Then either set `DEFAULT_API` at the top of the `<script>` in 
 3. Add talks from `#admin` (see above); the phone downloads them by itself. The badge turns green — **✓ အင်တာနက်မလိုဘဲ နားထောင်နိုင်သည် (Offline Ready)** — once the app is cached and at least one talk is saved.
 4. Turn on aeroplane mode and test before handing the phone over.
 
-Size guide: audio is about 22 MB per hour (≈48 kbps AAC); 360p video is about 250–300 MB per hour. Prefer **🎧 အသံသာ** (audio only).
+Size guide: audio is about 7 MB per hour (16 kbps mono Opus, made by the server with ffmpeg); 360p video is about 250–300 MB per hour. Prefer **🎧 အသံသာ** (audio only).
 
 ## Server environment variables (all optional)
 
@@ -178,6 +179,7 @@ Size guide: audio is about 22 MB per hour (≈48 kbps AAC); 360p video is about 
 | `MAX_CONCURRENT` | 2 | Parallel yt-dlp jobs |
 | `FILE_TTL_MIN` | 30 | A server temp file nobody has requested for this long is deleted (paused phone downloads resume within this window). Files are also deleted 2 min after the phone receives the last byte, at once when yt-dlp fails, and stray files older than this are swept every minute |
 | `MAX_FILE_AGE_DAYS` | 14 | Hard limit: any temp file (and yt-dlp's cache) is deleted after this many days, even if a stuck connection still holds it. `GET /health` shows `tempMB`, the disk the temp files use right now |
+| `AUDIO_KBPS` | 16 | Audio talks are re-encoded to mono Opus/WebM at this bitrate (speech). `0` keeps YouTube's original m4a (~22 MB/hour, and it cannot play while downloading) |
 | `AUDIO_FORMAT` / `VIDEO_FORMAT` | see server.js | yt-dlp `-f` selectors |
 | `YTDLP_JS_RUNTIME` | `node` | JS runtime yt-dlp uses for YouTube; set to empty for old yt-dlp |
 | `YTDLP_EXTRA_ARGS` | – | Extra yt-dlp flags |

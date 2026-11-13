@@ -79,6 +79,12 @@ const SUGGEST_PER_SOURCE = Number(process.env.SUGGEST_PER_SOURCE) || 8;
 // Skip very long uploads (e.g. 12-hour "sleep" compilations ≈ 250 MB even as audio).
 const SUGGEST_MAX_SEC = (Number(process.env.SUGGEST_MAX_HOURS) || 3) * 3600;
 
+// Audio talks are re-encoded to small mono Opus/WebM, tuned for speech: 16 kbps ≈ 7 MB per hour
+// (YouTube's smallest m4a is ≈ 22 MB/hour). Weak mobile lines and small phones benefit most.
+// AUDIO_KBPS=0 keeps YouTube's original file.
+const AUDIO_KBPS = Number(process.env.AUDIO_KBPS ?? 16);
+const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
+
 const FORMATS = {
   // Smallest m4a around 48 kbps (fine for speech); falls back to any small audio.
   audio: {
@@ -215,14 +221,19 @@ function runJob(job) {
     });
     const killer = setTimeout(() => { job.error = 'timeout'; proc.kill('SIGKILL'); }, JOB_TIMEOUT_MS);
 
-    const finish = code => {
+    const finish = async code => {
       clearTimeout(killer);
       job.proc = null;
-      job.finished = Date.now();
       if (!jobs.has(job.id)) return resolve();
       if (code === 0) {
-        const name = fs.readdirSync(TMP).find(f =>
+        let name = fs.readdirSync(TMP).find(f =>
           f.startsWith(job.id + '.') && !/\.(part|ytdl|temp)$/.test(f) && !/\.f\d+\./.test(f));
+        if (name && job.type === 'audio' && AUDIO_KBPS > 0) {
+          const small = await toSmallOpus(job, path.join(TMP, name));
+          if (!jobs.has(job.id)) return resolve();
+          if (small) { fs.rmSync(path.join(TMP, name), { force: true }); name = path.basename(small); }
+        }
+        job.finished = Date.now();
         if (name) {
           job.file = path.join(TMP, name);
           job.size = fs.statSync(job.file).size;
@@ -235,6 +246,7 @@ function runJob(job) {
           return resolve();
         }
       }
+      job.finished = Date.now();
       job.status = 'error';
       const lines = errTail.split('\n').filter(l => /ERROR/.test(l));
       job.error = job.error || (lines.pop() || `yt-dlp exited with code ${code}`).replace(/^.*?ERROR:\s*/, '').slice(0, 300);
@@ -244,6 +256,32 @@ function runJob(job) {
     };
     proc.on('error', err => { job.error = 'yt-dlp not found: ' + err.message; finish(-1); });
     proc.on('close', finish);
+  });
+}
+
+// Re-encode a downloaded talk to mono Opus in WebM (the phone can play it while it is still
+// downloading, via MediaSource). Resolves to the new path, or null to keep the original file.
+function toSmallOpus(job, src) {
+  const out = path.join(TMP, `${job.id}.small.webm`);
+  return new Promise(resolve => {
+    job.status = 'converting';
+    const p = spawn(FFMPEG, [
+      '-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-i', src,
+      '-vn', '-map_metadata', '-1', '-ac', '1',
+      '-c:a', 'libopus', '-b:a', `${AUDIO_KBPS}k`, '-application', 'voip',
+      '-f', 'webm', out,
+    ], { stdio: ['ignore', 'ignore', 'pipe'] });
+    job.proc = p;
+    let err = '';
+    p.stderr.on('data', d => { err = (err + d).slice(-500); });
+    const timer = setTimeout(() => p.kill('SIGKILL'), 15 * 60e3);
+    const done = ok => {
+      clearTimeout(timer); job.proc = null;
+      if (!ok) { fs.rmSync(out, { force: true }); console.warn(`[convert] ${job.id} failed, keeping original: ${err.trim()}`); }
+      resolve(ok ? out : null);
+    };
+    p.on('error', () => done(false));
+    p.on('close', c => done(c === 0 && fs.existsSync(out) && fs.statSync(out).size > 0));
   });
 }
 
