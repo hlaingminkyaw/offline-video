@@ -1,6 +1,6 @@
 /* Dhamma Player service worker – caches the app shell so the app opens with no internet.
    Media files are NOT cached here; they live in IndexedDB (see index.html). */
-const VERSION = 'v5';
+const VERSION = 'v6';
 const SHELL_CACHE = 'dhamma-shell-' + VERSION;
 const FONT_CACHE = 'dhamma-fonts-v1';
 const SHELL = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];

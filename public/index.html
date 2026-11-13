@@ -98,8 +98,11 @@
   #sugList .meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .item-text .admin-only { font-size: 0.85rem; }
   .hdr { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .gear { flex: none; width: 48px; height: 48px; font-size: 1.3rem; color: var(--muted); background: transparent;
-          border: 2px solid var(--line); border-radius: 12px; touch-action: manipulation; }
+  /* Title doubles as the hidden admin entrance (5 quick taps) – looks like plain text */
+  #appTitle { -webkit-user-select: none; user-select: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; cursor: default; }
+  /* Admin view never renders unless unlocked (#admin or ?admin=1) */
+  body:not(.admin) #admin { display: none !important; }
+  #installBtn { margin: 10px 0 0; }
   h3 { font-size: 1.1rem; margin: 20px 0 4px; }
   details { margin: 8px 0; }
   .cat { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
@@ -144,19 +147,17 @@
 </head>
 <body>
 <header>
-  <div class="hdr">
-    <h1>☸ ဓမ္မ နားထောင်ရန်</h1>
-    <!-- Tap 5 times quickly to open the admin view (or open the page with #admin) -->
-    <button id="gearBtn" class="gear" aria-label="Settings">⚙</button>
-  </div>
+  <!-- Admin: open the page with #admin or ?admin=1, or tap this title 5 times within 3 seconds -->
+  <h1 id="appTitle">☸ ဓမ္မ နားထောင်ရန်</h1>
   <div id="badge" class="badge warn">⏳ ပြင်ဆင်နေသည်…</div>
   <div id="net" class="net"></div>
+  <button id="installBtn" class="btn light small" hidden>📲 ဖုန်း Home Screen သို့ ထည့်မည် (Install App)</button>
 </header>
 
 <main>
   <!-- ===== Admin view (hidden from grandma) ===== -->
   <section id="admin" hidden>
-    <button id="homeBtn" class="btn">⬅ ပင်မစာမျက်နှာ (Home)</button>
+    <button id="homeBtn" class="btn">← အဘွားမျက်နှာပြင်သို့ ပြန်သွားမည် (Exit Admin)</button>
     <div class="card">
       <h2>🔐 Admin – Remote Catalog</h2>
       <div id="pinBox">
@@ -206,7 +207,6 @@
       <h2>📱 ဤဖုန်း (This phone)</h2>
       <button id="syncBtn" class="btn small">🔄 ယခု Sync လုပ်မည် (Sync now)</button>
       <p id="syncInfo" class="hint"></p>
-      <button id="installBtn" class="btn light small" hidden>📲 Home Screen သို့ ထည့်မည် (Install)</button>
       <details id="addLocal">
         <summary>📁 တရားဖိုင် အသစ်ထည့်မည် (Add Local File)</summary>
         <label>ဖိုင် ရွေးပါ (MP3 / M4A / MP4)
@@ -281,7 +281,7 @@
 <script>
 'use strict';
 /* ===================== Config & text ===================== */
-// Put your backend URL here (or set it in ⚙ Settings). '' = same server that serves this page.
+// Put your backend URL here (or set it in #admin → Server). '' = same server that serves this page.
 // On Vercel (no yt-dlp there) the page uses the VPS backend; everywhere else the same server.
 var DEFAULT_API = /\.vercel\.app$/.test(location.hostname) ? 'https://150.95.27.200.sslip.io' : '';
 var CHUNK = 2 * 1024 * 1024;   // downloads are saved in 2 MB pieces -> RAM never holds the whole file
@@ -1112,7 +1112,7 @@ async function syncCatalog() {
   }
 }
 
-/* ===================== Admin view (#admin or 5 taps on ⚙) ===================== */
+/* ===================== Admin view (#admin, ?admin=1, or 5 taps on the title) ===================== */
 var ADMIN = { pin: null };
 function ssGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
 function ssSet(k, v) { try { if (v) sessionStorage.setItem(k, v); else sessionStorage.removeItem(k); } catch (e) {} }
@@ -1239,8 +1239,11 @@ async function refreshSuggestionsNow() {
   finally { btn.disabled = false; btn.textContent = label; }
 }
 
+function adminRequested() {
+  return location.hash === '#admin' || new URLSearchParams(location.search).get('admin') === '1';
+}
 function route() {
-  var on = location.hash === '#admin';
+  var on = adminRequested();
   document.body.classList.toggle('admin', on);
   $('#admin').hidden = !on;
   if (on) {
@@ -1271,15 +1274,20 @@ $('#seek').addEventListener('input', function () { seeking = true; $('#cur').tex
 $('#seek').addEventListener('change', function () { seeking = false; seekTo(+this.value); });
 $('#saveLocalBtn').addEventListener('click', saveLocalFile);
 // Admin wiring
-var gearTaps = [];
-$('#gearBtn').addEventListener('click', function () {
+var titleTaps = [];
+$('#appTitle').addEventListener('click', function () {
   var now = Date.now();
-  gearTaps = gearTaps.filter(function (t) { return now - t < 3000; });
-  gearTaps.push(now);
-  if (gearTaps.length >= 5) { gearTaps = []; location.hash = '#admin'; }
+  titleTaps = titleTaps.filter(function (t) { return now - t < 3000; });
+  titleTaps.push(now);
+  if (titleTaps.length >= 5) { titleTaps = []; location.hash = '#admin'; }
 });
+// Exit Admin: log out, drop #admin / ?admin=1 from the URL and hide the admin view completely
 $('#homeBtn').addEventListener('click', function () {
-  history.replaceState(null, '', location.pathname + location.search); route();
+  adminLogout();
+  var q = new URLSearchParams(location.search); q.delete('admin');
+  var qs = q.toString();
+  history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+  route();
 });
 $('#pinBtn').addEventListener('click', function () { var p = $('#pinInput').value.trim(); if (p) adminLogin(p); });
 $('#pinInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#pinBtn').click(); });
