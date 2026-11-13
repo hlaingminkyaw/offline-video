@@ -1,0 +1,6 @@
+node_modules/
+# runtime data written by the server (catalog.json, sources.json)
+server/data/
+*.tmp
+.DS_Store
+.env

@@ -1,0 +1,1370 @@
+<!doctype html>
+<html lang="my">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#5a2d00">
+<meta name="color-scheme" content="light">
+<title>ဓမ္မ နားထောင်ရန်</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<!-- Unicode Burmese font (cached by sw.js). Loaded non-blocking so a bad connection never freezes the page. -->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" crossorigin="anonymous" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;700&display=swap">
+<style>
+  /* Plain, flat, high-contrast. No animations, blur, gradients or shadows (cheap for a 2GB phone). */
+  :root {
+    --bg: #fffaf0; --card: #ffffff; --fg: #111111; --muted: #3d3d3d; --line: #b9a27a;
+    --pri: #5a2d00; --pri-fg: #ffffff; --ok-bg: #0b6b2e; --warn-bg: #8a4b00; --off-bg: #6b0b0b;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 21px; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg); line-height: 1.8;
+    font-family: "Noto Sans Myanmar", "Myanmar Text", "Padauk", "Pyidaungsu", sans-serif;
+  }
+  header, main { max-width: 640px; margin: 0 auto; padding: 12px 16px; }
+  h1 { font-size: 1.45rem; margin: 4px 0 8px; color: var(--pri); }
+  h2 { font-size: 1.2rem; margin: 0 0 8px; }
+  .badge { display: block; padding: 10px 14px; border-radius: 10px; font-weight: 700; color: #fff; font-size: 1.05rem; }
+  .badge.ok { background: var(--ok-bg); }
+  .badge.warn { background: var(--warn-bg); }
+  .net { margin: 6px 0 0; font-weight: 700; font-size: 1rem; }
+  .net.off { color: var(--off-bg); }
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 14px; margin: 0 0 16px; }
+  .btn {
+    display: block; width: 100%; min-height: 68px; margin: 8px 0; padding: 10px 12px;
+    font: inherit; font-size: 1.1rem; font-weight: 700; line-height: 1.5;
+    color: var(--pri-fg); background: var(--pri); border: 3px solid var(--pri); border-radius: 14px;
+    cursor: pointer; touch-action: manipulation;
+  }
+  .btn:active { background: #000; }
+  .btn:disabled { background: #9a9a9a; border-color: #9a9a9a; }
+  .btn.big { min-height: 96px; font-size: 1.55rem; }
+  .btn.light { background: #fff; color: var(--pri); }
+  .btn.small { min-height: 56px; font-size: 1rem; }
+  .row { display: flex; gap: 10px; }
+  .row .btn { flex: 1; }
+  .np-title { font-size: 1.3rem; font-weight: 700; word-break: break-word; }
+  .np-monk { font-size: 1.05rem; color: var(--muted); }
+  .np-src { font-size: 0.95rem; font-weight: 700; margin-top: 4px; }
+  #ytBox { margin: 10px 0; background: #000; }
+  #ytBox iframe { display: block; width: 100%; height: 200px; border: 0; }
+  video { display: block; width: 100%; max-height: 42vh; background: #000; margin: 10px 0; }
+  .seek { margin: 10px 0 4px; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 48px; margin: 0; background: transparent; }
+  input[type=range]::-webkit-slider-runnable-track { height: 12px; background: #d9cbb0; border-radius: 6px; }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 38px; height: 38px; margin-top: -13px;
+    border-radius: 50%; background: var(--pri); border: 4px solid #fff; outline: 2px solid var(--pri);
+  }
+  .time { text-align: center; font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #list, #sugList { list-style: none; margin: 0; padding: 0; }
+  .item { border: 2px solid var(--line); border-radius: 12px; margin: 0 0 12px; overflow: hidden; }
+  .item.current { border-color: var(--pri); border-width: 4px; }
+  .item-main {
+    display: flex; gap: 12px; align-items: center; width: 100%; padding: 10px; text-align: left;
+    font: inherit; color: var(--fg); background: #fff; border: 0; cursor: pointer;
+  }
+  .thumb { flex: none; width: 96px; height: 54px; object-fit: cover; background: #222; border-radius: 6px; }
+  .ico { flex: none; width: 96px; height: 54px; display: flex; align-items: center; justify-content: center;
+         font-size: 2rem; background: #f1e6d0; border-radius: 6px; }
+  .item-text { display: flex; flex-direction: column; min-width: 0; }
+  .item-text b { font-size: 1.1rem; word-break: break-word; }
+  .item-text span { font-size: 0.95rem; color: var(--muted); }
+  .st { font-weight: 700; }
+  .st.ok { color: var(--ok-bg); }
+  .st.err { color: var(--off-bg); }
+  .item-actions { display: flex; gap: 8px; padding: 0 10px 10px; justify-content: flex-end; }
+  .item-actions .btn { min-height: 52px; margin: 0; font-size: 0.95rem; }
+  .item-actions .btn[data-act=del] { flex: none; width: auto; padding: 6px 18px; }
+  /* Grandma view: no delete/retry buttons, no technical details */
+  body:not(.admin) .item-actions, body:not(.admin) .admin-only { display: none !important; }
+  .item-text .pill {
+    align-self: flex-start; margin-top: 4px; padding: 2px 12px; border-radius: 8px;
+    color: #fff; font-weight: 700; font-size: 1rem;
+  }
+  .pill.ok { background: var(--ok-bg); }
+  .pill.dl { background: #1f4e8c; }
+  .pill.err { background: var(--off-bg); }
+  .pill.play { background: var(--pri); font-size: 1.05rem; padding: 4px 14px; }
+  .h-en { font-size: 0.85rem; color: var(--muted); font-weight: 700; white-space: nowrap; }
+  .sub { font-size: 1rem; color: var(--muted); margin: 0 0 10px; }
+  #sugSec { border-color: var(--pri); }
+  /* long YouTube titles: max 3 lines so cards stay short and easy to scan */
+  #sugList .item-text b { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  #sugList .meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-text .admin-only { font-size: 0.85rem; }
+  .hdr { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .gear { flex: none; width: 48px; height: 48px; font-size: 1.3rem; color: var(--muted); background: transparent;
+          border: 2px solid var(--line); border-radius: 12px; touch-action: manipulation; }
+  h3 { font-size: 1.1rem; margin: 20px 0 4px; }
+  details { margin: 8px 0; }
+  .cat { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .cat-text { flex: 1; min-width: 0; word-break: break-word; font-size: 0.95rem; }
+  .cat .btn { flex: none; width: auto; min-height: 48px; margin: 0; padding: 4px 14px; font-size: 0.9rem; }
+  summary { font-size: 1.15rem; font-weight: 700; min-height: 56px; padding: 8px 0; cursor: pointer; color: var(--pri); }
+  label { display: block; margin: 12px 0 0; font-weight: 700; }
+  input[type=text], input[type=url], input[type=file] {
+    display: block; width: 100%; margin-top: 6px; padding: 12px; font: inherit; font-size: 1.05rem;
+    border: 2px solid #555; border-radius: 10px; background: #fff; color: #000;
+  }
+  fieldset { border: 0; padding: 0; margin: 12px 0 0; }
+  .radio { display: flex; align-items: center; gap: 10px; min-height: 56px; font-weight: 700; margin: 4px 0;
+           border: 2px solid var(--line); border-radius: 10px; padding: 6px 12px; }
+  .radio input { width: 28px; height: 28px; accent-color: var(--pri); }
+  .hint { font-size: 0.9rem; color: var(--muted); margin: 6px 0 0; overflow-wrap: anywhere; }
+  #toast {
+    position: fixed; left: 12px; right: 12px; bottom: 16px; max-width: 616px; margin: 0 auto; z-index: 9;
+    padding: 14px 16px; border-radius: 12px; background: #111; color: #fff; font-weight: 700; font-size: 1.05rem;
+    pointer-events: none;   /* never block taps on the buttons underneath */
+  }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <h1>☸ ဓမ္မ နားထောင်ရန်</h1>
+    <!-- Tap 5 times quickly to open the admin view (or open the page with #admin) -->
+    <button id="gearBtn" class="gear" aria-label="Settings">⚙</button>
+  </div>
+  <div id="badge" class="badge warn">⏳ ပြင်ဆင်နေသည်…</div>
+  <div id="net" class="net"></div>
+</header>
+
+<main>
+  <!-- ===== Admin view (hidden from grandma) ===== -->
+  <section id="admin" hidden>
+    <button id="homeBtn" class="btn">⬅ ပင်မစာမျက်နှာ (Home)</button>
+    <div class="card">
+      <h2>🔐 Admin – Remote Catalog</h2>
+      <div id="pinBox">
+        <label>Admin PIN
+          <input id="pinInput" type="password" inputmode="numeric" autocomplete="off">
+        </label>
+        <button id="pinBtn" class="btn">ဝင်မည် (Login)</button>
+      </div>
+      <div id="adminPanel" hidden>
+        <h3>➕ တရားအသစ် ပို့မည် (Push a talk to her phone)</h3>
+        <label>YouTube လင့်ခ်
+          <input id="cUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://youtu.be/...">
+        </label>
+        <label>ခေါင်းစဉ် (ဗလာထားလျှင် YouTube မှ ယူမည်)
+          <input id="cTitle" type="text" autocomplete="off">
+        </label>
+        <label>ဆရာတော် ဘွဲ့အမည် (ဗလာထားလျှင် Channel အမည်)
+          <input id="cMonk" type="text" autocomplete="off">
+        </label>
+        <fieldset>
+          <label class="radio"><input type="radio" name="cType" value="audio" checked> 🎧 Audio (49kbps m4a · ~22 MB/hr)</label>
+          <label class="radio"><input type="radio" name="cType" value="video"> 🎬 Video (360p mp4 · ~250 MB/hr)</label>
+        </fieldset>
+        <button id="cAddBtn" class="btn">➕ Catalog သို့ ထည့်မည်</button>
+        <h3>📋 Catalog <span id="cCount"></span></h3>
+        <div id="catList"></div>
+        <p id="catInfo" class="hint"></p>
+
+        <h3>✨ အကြံပြုချက် ရင်းမြစ်များ (Suggestion sources)</h3>
+        <p class="hint">ဤနေရာမှ တရားများကို မဒေါင်းပါ — အဖွားက နှိပ်ဖွင့်မှသာ ဖုန်းထဲ သိမ်းပါမည်။</p>
+        <label>Channel / Playlist URL သို့မဟုတ် ရှာမည့်စကားလုံး
+          <input id="sUrl" type="text" autocomplete="off" placeholder="ytsearch8:မိုးကုတ်ဆရာတော် တရားတော်">
+        </label>
+        <label>အမည် (Label, ဥပမာ ဆရာတော် ဘွဲ့)
+          <input id="sLabel" type="text" autocomplete="off">
+        </label>
+        <button id="sAddBtn" class="btn">➕ Source ထည့်မည်</button>
+        <div id="srcList"></div>
+        <button id="sRefreshBtn" class="btn small light">🔄 အကြံပြုချက်များ ယခု ပြန်ရှာမည် (Refresh)</button>
+        <p id="srcInfo" class="hint"></p>
+
+        <button id="logoutBtn" class="btn small light">🔒 Logout</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📱 ဤဖုန်း (This phone)</h2>
+      <button id="syncBtn" class="btn small">🔄 ယခု Sync လုပ်မည် (Sync now)</button>
+      <p id="syncInfo" class="hint"></p>
+      <button id="installBtn" class="btn light small" hidden>📲 Home Screen သို့ ထည့်မည် (Install)</button>
+      <details id="addLocal">
+        <summary>📁 တရားဖိုင် အသစ်ထည့်မည် (Add Local File)</summary>
+        <label>ဖိုင် ရွေးပါ (MP3 / M4A / MP4)
+          <input id="file" type="file" accept="audio/*,video/mp4,.mp3,.m4a,.mp4,.aac">
+        </label>
+        <label>တရားခေါင်းစဉ် (Title)
+          <input id="lTitle" type="text" autocomplete="off">
+        </label>
+        <label>ဆရာတော် ဘွဲ့အမည် (Monk)
+          <input id="lMonk" type="text" autocomplete="off">
+        </label>
+        <button id="saveLocalBtn" class="btn">💾 ဖုန်းထဲ သိမ်းမည်</button>
+      </details>
+      <details id="settings">
+        <summary>⚙ Server</summary>
+        <label>ဆာဗာ လိပ်စာ (Server URL)
+          <input id="apiUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://your-app.onrender.com">
+        </label>
+        <p class="hint">App ကို ဆာဗာကနေ တိုက်ရိုက်ဖွင့်ထားရင် ဗလာ ထားခဲ့ပါ။</p>
+        <div class="row">
+          <button id="saveApiBtn" class="btn small">သိမ်းမည်</button>
+          <button id="testApiBtn" class="btn small light">စမ်းသပ်မည်</button>
+        </div>
+        <p id="storageInfo" class="hint"></p>
+      </details>
+      <p class="hint">ဖုန်းထဲက တရားကို ဖျက်ရန် အောက်ပါစာရင်းရှိ 🗑 ကို နှိပ်ပါ။</p>
+    </div>
+  </section>
+
+  <!-- Player -->
+  <section class="card" aria-label="Player">
+    <div id="npEmpty">👇 နားထောင်လိုသော တရားကို အောက်ပါစာရင်းမှ နှိပ်ပါ</div>
+    <div id="np" hidden>
+      <div id="npTitle" class="np-title"></div>
+      <div id="npMonk" class="np-monk"></div>
+      <div id="npSrc" class="np-src"></div>
+    </div>
+    <div id="ytBox" hidden></div>
+    <video id="video" playsinline preload="metadata" hidden></video>
+    <audio id="audio" preload="metadata"></audio>
+    <div class="seek">
+      <input id="seek" type="range" min="0" max="0" step="1" value="0" aria-label="Position">
+      <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+    </div>
+    <button id="playBtn" class="btn big" disabled>▶ ဖွင့်မည်</button>
+    <div class="row">
+      <button id="backBtn" class="btn" disabled>⏪ ၁၅ စက္ကန့် နောက်သို့</button>
+      <button id="fwdBtn" class="btn" disabled>၁၅ စက္ကန့် ရှေ့သို့ ⏩</button>
+    </div>
+    <button id="fsBtn" class="btn light small" hidden>⛶ မျက်နှာပြင်အပြည့် ကြည့်မည်</button>
+  </section>
+
+  <!-- Library -->
+  <section class="card">
+    <h2>💾 သိမ်းထားပြီးသား တရားတော်များ <span class="h-en">(Saved Offline)</span></h2>
+    <p class="sub">အင်တာနက် မရှိလည်း အချိန်မရွေး နားထောင်နိုင်သည်။</p>
+    <ul id="list"></ul>
+    <p id="listEmpty" hidden>တရားတော်များ မကြာမီ ရောက်ရှိလာပါမည်။ 🙏</p>
+  </section>
+
+  <!-- Suggestions: online only. Nothing is downloaded until a talk is tapped. -->
+  <section class="card" id="sugSec" hidden>
+    <h2>✨ နားထောင်ရန် အကြံပြုချက်များ <span class="h-en">(Suggested Talks)</span></h2>
+    <p class="sub">နှိပ်လိုက်လျှင် ချက်ချင်းဖွင့်ပေးပြီး ဖုန်းထဲသို့လည်း သိမ်းပေးပါမည်။</p>
+    <p id="sugMsg" class="sub"></p>
+    <ul id="sugList"></ul>
+  </section>
+</main>
+
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+'use strict';
+/* ===================== Config & text ===================== */
+// Put your backend URL here (or set it in ⚙ Settings). '' = same server that serves this page.
+var DEFAULT_API = '';
+var CHUNK = 2 * 1024 * 1024;   // downloads are saved in 2 MB pieces -> RAM never holds the whole file
+
+var T = {
+  ready: '✓ အင်တာနက်မလိုဘဲ နားထောင်နိုင်သည် (Offline Ready)',
+  preparing: '⏳ Offline အတွက် ပြင်ဆင်နေသည်…',
+  needFile: '⏳ တရားဖိုင် သိမ်းပြီးမှ Offline နားထောင်နိုင်မည်',
+  online: '🌐 အင်တာနက် ရှိသည်',
+  offline: '📴 အင်တာနက် မရှိပါ — ဖုန်းထဲက တရားများ ဖွင့်နိုင်သည်',
+  play: '▶ ဖွင့်မည်', pause: '⏸ ခဏရပ်မည်',
+  cached: 'Offline Ready ✓',
+  onlineOnly: '🌐 အင်တာနက်ဖြင့်သာ ဖွင့်နိုင်သေးသည်',
+  queued: '⏳ ဒေါင်းလုဒ်ဆွဲရန် စောင့်နေသည်',
+  waitNet: '📴 အင်တာနက် ပြန်ရလျှင် ဆက်ဒေါင်းမည်',
+  connecting: '⬇ ဒေါင်းလုဒ်ဆွဲနေသည်...',
+  serverPrep: '⬇ ဒေါင်းလုဒ်ဆွဲနေသည်... (ပြင်ဆင်နေ)',
+  saving: '⬇ ဒေါင်းလုဒ်ဆွဲနေသည်...',
+  removedMark: '(Catalog မှ ဖယ်ထားသည် — ဖုန်းထဲတွင် ဆက်ရှိသည်)',
+  newTalks: function (n) { return '🙏 တရားတော်အသစ် ' + n + ' ပုဒ် ရောက်ရှိလာပါပြီ'; },
+  syncing: '🔄 Catalog စစ်နေသည်…',
+  synced: '✓ နောက်ဆုံး Sync: ',
+  syncFail: '⚠ Catalog ယူ၍ မရပါ: ',
+  badPin: '❌ PIN မှားနေသည်',
+  fetchingTitle: '⏳ ခေါင်းစဉ် ရှာနေသည်…',
+  catAdded: '✓ Catalog သို့ ထည့်ပြီး: ',
+  catRemoved: '✓ Catalog မှ ဖယ်ပြီးပါပြီ',
+  catEmpty: 'Catalog ထဲတွင် တရား မရှိသေးပါ။',
+  catConfirmDel: 'Catalog မှ ဖယ်မှာ သေချာပါသလား? (ဖုန်းထဲ သိမ်းပြီးသားဖိုင်ကို မဖျက်ပါ)',
+  onPhone: '📱 ဖုန်းထဲရှိ ✓', notOnPhone: '📱 မရှိသေး',
+  listen: '▶ နားထောင်မည်',
+  sugLoading: '⏳ အကြံပြုချက်များ ရှာနေသည်…',
+  sugFail: 'အကြံပြုချက်များ ယခု မရနိုင်သေးပါ။ နောက်မှ ပြန်ကြည့်ပါ။',
+  sugAllSaved: '✓ အကြံပြုထားသော တရားအားလုံး ဖုန်းထဲ ရှိပြီးပါပြီ။',
+  sugUpdated: 'နောက်ဆုံး ရှာခဲ့ချိန်: ',
+  srcAdded: '✓ Source ထည့်ပြီး — ရှာနေပါသည်',
+  srcConfirmDel: 'ဤ Source ကို ဖယ်မှာ သေချာပါသလား?',
+  dlFail: '⚠ သိမ်း၍ မရပါ',
+  noSpace: '⚠ ဖုန်းထဲ နေရာ မလောက်ပါ',
+  retry: '🔄 ပြန်ကြိုးစားမည်',
+  del: '🗑 ဖျက်မည်',
+  confirmDel: 'ဤတရားကို ဖုန်းထဲမှ ဖျက်မှာ သေချာပါသလား?',
+  srcLocal: '📱 ဖုန်းထဲမှ ဖွင့်နေသည် (Offline)',
+  srcYT: '🌐 YouTube မှ ဖွင့်နေသည် (Online)',
+  switched: 'အင်တာနက် ပြတ်သွားသဖြင့် ဖုန်းထဲက ဖိုင်ဖြင့် ဆက်ဖွင့်နေသည်',
+  switchedReady: 'ဖုန်းထဲ သိမ်းပြီးပါပြီ — ဖုန်းထဲက ဖိုင်ဖြင့် ဆက်ဖွင့်နေသည်',
+  notCached: 'ဤတရားကို ဖုန်းထဲ မသိမ်းရသေးပါ။ အင်တာနက် ပြန်ရမှ ဖွင့်နိုင်မည်။',
+  ytBlocked: 'YouTube က ဤနေရာတွင် ဖွင့်ခွင့်မပြုပါ။ ဖုန်းထဲ သိမ်းပြီးလျှင် အလိုအလျောက် ဖွင့်ပေးမည်။',
+  ytFail: 'YouTube ဖွင့်၍ မရပါ',
+  resumeAt: ' မှ ဆက်ဖွင့်နေသည်',
+  stoppedAt: 'ရပ်ခဲ့သည်: ',
+  ended: 'တရားတော် ပြီးဆုံးပါပြီ — သာဓု သာဓု သာဓု 🙏',
+  pick: 'တရားတစ်ပုဒ် အရင်ရွေးပါ',
+  pickFile: 'ဖိုင် အရင်ရွေးပါ',
+  savingLocal: 'သိမ်းနေသည်… ခဏစောင့်ပါ',
+  savedLocal: 'ဖုန်းထဲ သိမ်းပြီးပါပြီ ✓',
+  badLink: 'YouTube လင့်ခ် မှားနေသည်',
+  needNet: 'YouTube လင့်ခ်ထည့်ရန် အင်တာနက် လိုသည်',
+  wait: 'ခဏစောင့်ပါ…',
+  playErr: 'ဖိုင် ဖွင့်၍ မရပါ',
+  saved: 'သိမ်းပြီးပါပြီ ✓',
+  serverOk: 'ဆာဗာ အလုပ်လုပ်သည် ✓',
+  serverBad: 'ဆာဗာ ချိတ်၍ မရပါ',
+  persisted: '✓ ဖိုင်များကို Chrome က အလိုအလျောက် မဖျက်ပါ',
+  notPersisted: '⚠ Home Screen သို့ ထည့်ထားပါက ဖိုင်များ ပိုလုံခြုံသည်',
+  used: 'အသုံးပြုထားသည်: ', free: ' / နေရာလွတ်: '
+};
+
+/* ===================== Small helpers ===================== */
+function $(s) { return document.querySelector(s); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function fmt(sec) {
+  sec = Math.max(0, Math.floor(sec || 0));
+  var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s;
+}
+function mb(b) { return (b / 1048576).toFixed(1); }
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+var toastTimer = 0;
+function toast(msg) {
+  var el = $('#toast'); el.textContent = msg; el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 5000);
+}
+function apiBase() {
+  var v = '';
+  try { v = localStorage.getItem('api') || ''; } catch (e) {}
+  return (v || DEFAULT_API).replace(/\/+$/, '');
+}
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function fetchT(url, opts, ms) {   // fetch with timeout
+  var c = new AbortController(), t = setTimeout(function () { c.abort(); }, ms || 10000);
+  opts = opts || {}; opts.signal = c.signal;
+  return fetch(url, opts).finally(function () { clearTimeout(t); });
+}
+function guessMime(name, type) {
+  var ext = (name.split('.').pop() || '').toLowerCase();
+  var byExt = { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', mp4: 'video/mp4', ogg: 'audio/ogg',
+                opus: 'audio/ogg', wav: 'audio/wav', webm: 'audio/webm' }[ext];
+  // Android/desktop report odd types (audio/x-m4a, audio/mp3, empty) -> use standard ones
+  if (!type || /x-m4a|mp3$|x-mpeg|octet-stream/.test(type)) return byExt || type || 'audio/mpeg';
+  return type;
+}
+// Cache the Burmese font through the service worker once (first visit loads it before the SW is active).
+var FONT_CSS = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;700&display=swap';
+function warmFontCache() {
+  if (!navigator.onLine || lsGet('fontsCached') || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+  fetch(FONT_CSS, { mode: 'cors' }).then(function (r) { return r.text(); }).then(function (css) {
+    var urls = css.match(/https:\/\/fonts\.gstatic\.com\/[^)'"]+/g) || [];
+    return Promise.all(urls.map(function (u) { return fetch(u, { mode: 'cors' }); }));
+  }).then(function () { lsSet('fontsCached', '1'); }).catch(function () {});
+}
+function parseYouTubeId(input) {
+  var s = String(input || '').trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  var u; try { u = new URL(s); } catch (e) { return null; }
+  var host = u.hostname.replace(/^(www|m|music)\./, ''), id = null, m;
+  if (host === 'youtu.be') id = u.pathname.split('/')[1];
+  else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    if (u.pathname === '/watch') id = u.searchParams.get('v');
+    else if ((m = u.pathname.match(/^\/(?:shorts|live|embed|v)\/([^/?#]+)/))) id = m[1];
+  }
+  return /^[A-Za-z0-9_-]{11}$/.test(id || '') ? id : null;
+}
+
+/* ===================== IndexedDB =====================
+   tracks : {id, source:'local'|'youtube', kind:'audio'|'video', title, monk, mime, cached,
+             position, duration, added, ytId?, thumb?, dl?:{jobId, bytes, n}}
+   chunks : {id, n, blob}   media stored as Blob pieces (Chrome keeps IDB blobs on disk, not RAM) */
+var dbPromise = null;
+function db() {
+  if (!dbPromise) dbPromise = new Promise(function (res, rej) {
+    var r = indexedDB.open('dhamma', 1);
+    r.onupgradeneeded = function () {
+      var d = r.result;
+      if (!d.objectStoreNames.contains('tracks')) d.createObjectStore('tracks', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('chunks')) d.createObjectStore('chunks', { keyPath: ['id', 'n'] });
+    };
+    r.onsuccess = function () { res(r.result); };
+    r.onerror = function () { dbPromise = null; rej(r.error); };
+  });
+  return dbPromise;
+}
+// Run fn(stores...) inside one transaction; resolves with whatever fn stored in box.v.
+function txn(names, mode, fn) {
+  return db().then(function (d) {
+    return new Promise(function (res, rej) {
+      var t = d.transaction(names, mode), box = {};
+      fn.apply(null, [box, t].concat([].concat(names).map(function (n) { return t.objectStore(n); })));
+      t.oncomplete = function () { res(box.v); };
+      t.onabort = t.onerror = function () { rej(t.error || new Error('cancelled')); };
+    });
+  });
+}
+function chunkRange(id) { return IDBKeyRange.bound([id, 0], [id, Infinity]); }
+function getTrack(id) { return txn('tracks', 'readonly', function (b, t, s) { s.get(id).onsuccess = function (e) { b.v = e.target.result; }; }); }
+function allTracks() { return txn('tracks', 'readonly', function (b, t, s) { s.getAll().onsuccess = function (e) { b.v = e.target.result; }; }); }
+function putTrack(tr) { return txn('tracks', 'readwrite', function (b, t, s) { s.put(tr); }); }
+function getChunks(id) { return txn('chunks', 'readonly', function (b, t, s) { s.getAll(chunkRange(id)).onsuccess = function (e) { b.v = e.target.result; }; }); }
+function delChunks(id) { return txn('chunks', 'readwrite', function (b, t, s) { s.delete(chunkRange(id)); }); }
+function deleteTrack(id) {
+  return txn(['tracks', 'chunks'], 'readwrite', function (b, t, ts, cs) { ts.delete(id); cs.delete(chunkRange(id)); });
+}
+// Atomic read-modify-write of a track (no lost updates between position saves and downloads).
+function patch(id, obj) {
+  return txn('tracks', 'readwrite', function (b, t, s) {
+    s.get(id).onsuccess = function (e) {
+      var tr = e.target.result; if (!tr) return;
+      for (var k in obj) tr[k] = obj[k];
+      s.put(tr); b.v = tr;
+    };
+  });
+}
+// Save one downloaded piece + progress in a single transaction (crash-safe resume).
+// Aborts if the track was deleted meanwhile, so no orphan data is left behind.
+function saveChunk(id, n, blob, bytes) {
+  return txn(['tracks', 'chunks'], 'readwrite', function (b, t, ts, cs) {
+    ts.get(id).onsuccess = function (e) {
+      var tr = e.target.result;
+      if (!tr) { t.abort(); return; }
+      cs.put({ id: id, n: n, blob: blob });
+      tr.dl = tr.dl || {}; tr.dl.bytes = bytes; tr.dl.n = n + 1;
+      ts.put(tr);
+    };
+  });
+}
+function savePos(id, t) {
+  if (!id || !(t >= 0)) return Promise.resolve();
+  var tr = findTrack(id); if (tr) tr.position = t;
+  return patch(id, { position: t }).catch(function () {});
+}
+function requestPersist() {
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persisted().then(function (p) { return p || navigator.storage.persist(); })
+      .then(showStorage).catch(function () {});
+  }
+}
+
+/* ===================== Library state & rendering ===================== */
+var tracks = [];          // metadata only (small)
+var dlState = {};         // id -> {text, err}
+function findTrack(id) { for (var i = 0; i < tracks.length; i++) if (tracks[i].id === id) return tracks[i]; return null; }
+
+function refresh() {
+  return allTracks().then(function (list) {
+    tracks = (list || []).sort(function (a, b) { return b.added - a.added; });
+    renderList(); updateBadge(); renderSuggestions();
+  });
+}
+
+function statusHtml(t) {
+  if (t.cached) return '<span class="st pill ok" data-st="' + esc(t.id) + '">' + T.cached + '</span>';
+  if (t.source !== 'youtube') return '';
+  var s = dlState[t.id];
+  var text = s ? s.text : (navigator.onLine ? T.queued : T.waitNet);
+  return '<span class="st pill ' + (s && s.err ? 'err' : 'dl') + '" data-st="' + esc(t.id) + '">' + esc(text) + '</span>' +
+    (s && s.detail ? '<span class="admin-only">' + esc(s.detail) + '</span>' : '');
+}
+
+function renderList() {
+  var html = '';
+  for (var i = 0; i < tracks.length; i++) {
+    var t = tracks[i], id = esc(t.id);
+    var pic = t.thumb ? '<img class="thumb" alt="" src="' + esc(t.thumb) + '">'
+                      : '<span class="ico">' + (t.kind === 'video' ? '🎬' : '🎧') + '</span>';
+    var pos = t.position > 5 ? '<span>' + T.stoppedAt + fmt(t.position) + (t.duration ? ' / ' + fmt(t.duration) : '') + '</span>' : '';
+    var s = dlState[t.id];
+    html += '<li class="item' + (t.id === P.id ? ' current' : '') + '">' +
+      '<button class="item-main" data-act="play" data-id="' + id + '">' + pic +
+      '<span class="item-text"><b>' + (t.kind === 'video' ? '🎬 ' : '') + esc(t.title) + '</b>' +
+      (t.monk ? '<span>' + esc(t.monk) + '</span>' : '') + pos + statusHtml(t) +
+      (t.removed ? '<span class="admin-only">' + T.removedMark + '</span>' : '') + '</span></button>' +
+      '<div class="item-actions">' +
+      (s && s.err ? '<button class="btn small" data-act="retry" data-id="' + id + '">' + T.retry + '</button>' : '') +
+      '<button class="btn small light" data-act="del" data-id="' + id + '">' + T.del + '</button></div></li>';
+  }
+  $('#list').innerHTML = html;
+  $('#listEmpty').hidden = tracks.length > 0;
+}
+
+function setDl(id, text, err, detail) {
+  var prev = dlState[id];
+  dlState[id] = { text: text, err: !!err, detail: detail || '' };
+  var el = document.querySelector('[data-st="' + CSS.escape(id) + '"]');
+  if (!el || err || !!(prev && prev.err) !== !!err) { renderList(); return; }   // retry button / details change
+  el.textContent = text;
+}
+
+function updateBadge() {
+  var swReady = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+  var anyCached = tracks.some(function (t) { return t.cached; });
+  var b = $('#badge');
+  if (swReady && anyCached) { b.className = 'badge ok'; b.textContent = T.ready; }
+  else { b.className = 'badge warn'; b.textContent = swReady ? T.needFile : T.preparing; }
+  var n = $('#net');
+  n.textContent = navigator.onLine ? T.online : T.offline;
+  n.className = navigator.onLine ? 'net' : 'net off';
+}
+
+function showStorage() {
+  if (!navigator.storage || !navigator.storage.estimate) return;
+  Promise.all([navigator.storage.estimate(), navigator.storage.persisted ? navigator.storage.persisted() : false])
+    .then(function (r) {
+      var e = r[0];
+      $('#storageInfo').textContent = T.used + mb(e.usage || 0) + ' MB' + T.free +
+        mb(Math.max(0, (e.quota || 0) - (e.usage || 0))) + ' MB — ' + (r[1] ? T.persisted : T.notPersisted);
+    }).catch(function () {});
+}
+
+/* ===================== Player ===================== */
+var audioEl = $('#audio'), videoEl = $('#video');
+var P = { id: null, mode: null, el: null, url: null, yt: null, ytTimer: 0, ytLast: 0, token: 0, waitCache: false, lastSave: 0, lastSec: -1 };
+
+function showNP(tr) {
+  $('#npEmpty').hidden = true; $('#np').hidden = false;
+  $('#npTitle').textContent = tr.title;
+  $('#npMonk').textContent = tr.monk || '';
+  $('#npSrc').textContent = '';
+  if ('mediaSession' in navigator && window.MediaMetadata) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: tr.title, artist: tr.monk || '', artwork: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }]
+    });
+  }
+  var items = document.querySelectorAll('.item');
+  for (var i = 0; i < items.length; i++) {
+    var btn = items[i].querySelector('.item-main');
+    items[i].classList.toggle('current', btn && btn.getAttribute('data-id') === tr.id);
+  }
+}
+
+// Free everything held by the current track (iframe, media buffers, blob URL).
+function stopCurrent(save) {
+  var id = P.id;
+  if (P.mode === 'yt') {
+    var t = ytNow(); destroyYT();
+    if (save) savePos(id, t);
+  } else if (P.mode === 'media') {
+    var el = P.el;
+    if (save) savePos(id, el.currentTime);
+    el.pause(); el.removeAttribute('src'); el.load();   // releases decoder + buffers
+    el.hidden = true;
+  }
+  if (P.url) { URL.revokeObjectURL(P.url); P.url = null; }
+  P.mode = null; P.el = null; P.waitCache = false;
+}
+
+function loadTrack(id, autoplay) {
+  var token = ++P.token;
+  return getTrack(id).then(function (tr) {
+    if (!tr || token !== P.token) return;
+    stopCurrent(true);
+    P.id = id; lsSet('last', id);
+    showNP(tr); updateUI();
+    if (tr.cached) return playLocal(tr, tr.position || 0, autoplay !== false, token);
+    if (tr.source === 'youtube') {
+      if (navigator.onLine) return playYT(tr, tr.position || 0, token);
+      toast(T.notCached);
+    }
+  });
+}
+
+function playLocal(tr, at, autoplay, token) {
+  token = token || ++P.token;
+  return getChunks(tr.id).then(function (chunks) {
+    if (token !== P.token) return;
+    if (!chunks || !chunks.length) {
+      patch(tr.id, { cached: false }).then(refresh); toast(T.playErr); return;
+    }
+    // Composite Blob just references the on-disk IDB blobs – no copy into RAM.
+    var blob = new Blob(chunks.map(function (c) { return c.blob; }), { type: tr.mime || 'audio/mp4' });
+    chunks = null;
+    if (P.url) URL.revokeObjectURL(P.url);   // always revoke the previous blob URL first
+    P.url = URL.createObjectURL(blob);
+    blob = null;
+    var el = tr.kind === 'video' ? videoEl : audioEl;
+    var other = el === videoEl ? audioEl : videoEl;
+    if (other.getAttribute('src')) { other.pause(); other.removeAttribute('src'); other.load(); }
+    other.hidden = true;
+    videoEl.hidden = el !== videoEl;
+    P.mode = 'media'; P.el = el; P.lastSec = -1;
+    $('#npSrc').textContent = T.srcLocal;
+    el.addEventListener('loadedmetadata', function () {
+      if (token !== P.token) return;
+      if (isFinite(el.duration) && el.duration > 0) {
+        if (!tr.duration) patch(tr.id, { duration: el.duration });
+        if (at > 3 && at < el.duration - 3) { el.currentTime = at; toast(fmt(at) + T.resumeAt); }
+      }
+      if (autoplay) el.play().catch(function () { updateUI(); });
+      updateUI(); updateTime();
+    }, { once: true });
+    el.src = P.url;
+    el.load();
+    updateUI();
+  });
+}
+
+/* ---------- YouTube IFrame (only while online & not yet cached) ---------- */
+var ytApiPromise = null;
+function loadYTApi() {
+  if (window.YT && window.YT.Player) return Promise.resolve();
+  if (ytApiPromise) return ytApiPromise;
+  ytApiPromise = new Promise(function (res, rej) {
+    var s = document.createElement('script');
+    var fail = function () { ytApiPromise = null; s.remove(); rej(new Error('yt api')); };
+    var timer = setTimeout(fail, 20000);
+    window.onYouTubeIframeAPIReady = function () { clearTimeout(timer); res(); };
+    s.onerror = function () { clearTimeout(timer); fail(); };
+    s.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+  });
+  return ytApiPromise;
+}
+
+function playYT(tr, at, token) {
+  return loadYTApi().then(function () { return getTrack(tr.id); }).then(function (fresh) {
+    if (token !== P.token) return;
+    // The download may have finished while the YouTube script was loading -> use the light local file.
+    if (fresh && fresh.cached) return playLocal(fresh, fresh.position || at, true, token);
+    if (!navigator.onLine) { toast(T.notCached); return; }
+    var box = $('#ytBox');
+    box.innerHTML = '<div id="ytPlayer"></div>';
+    box.hidden = false;
+    P.mode = 'yt'; P.ytLast = at;
+    $('#npSrc').textContent = T.srcYT;
+    P.yt = new YT.Player('ytPlayer', {
+      videoId: tr.ytId, width: '100%', height: '200',
+      playerVars: { playsinline: 1, rel: 0, autoplay: 1, start: Math.floor(at) },
+      events: {
+        onReady: function (e) { try { e.target.playVideo(); } catch (x) {} updateUI(); },
+        onStateChange: onYTState,
+        onError: onYTError
+      }
+    });
+    P.ytTimer = setInterval(ytTick, 1000);
+    updateUI();
+  }).catch(function () { if (token === P.token) toast(T.ytFail); });
+}
+
+function ytNow() {
+  try { var v = P.yt.getCurrentTime(); if (v > 0) P.ytLast = v; } catch (e) {}
+  return P.ytLast || 0;
+}
+function ytPlaying() {
+  try { var s = P.yt.getPlayerState(); return s === 1 || s === 3; } catch (e) { return false; }
+}
+function destroyYT() {
+  clearInterval(P.ytTimer); P.ytTimer = 0;
+  if (P.yt) { try { P.yt.destroy(); } catch (e) {} P.yt = null; }
+  var box = $('#ytBox'); box.innerHTML = ''; box.hidden = true;   // iframe fully removed from DOM
+}
+function ytTick() {
+  if (P.mode !== 'yt') return;
+  ytNow(); updateTime();
+  if (Date.now() - P.lastSave > 10000 && ytPlaying()) { P.lastSave = Date.now(); savePos(P.id, P.ytLast); }
+}
+function onYTState(e) {
+  if (e.data === 0) { savePos(P.id, 0); toast(T.ended); }
+  else if (e.data === 2) savePos(P.id, ytNow());
+  updateUI();
+}
+function onYTError(e) {
+  if (P.mode !== 'yt') return;
+  var id = P.id, t = ytNow(), token = P.token;
+  P.mode = null; savePos(id, t);
+  setTimeout(destroyYT, 0);       // don't destroy the player inside its own callback
+  getTrack(id).then(function (tr) {
+    if (token !== P.token) return;
+    if (tr && tr.cached) return playLocal(tr, t, true);
+    P.waitCache = true;            // play automatically as soon as the download finishes
+    toast(e && (e.data === 101 || e.data === 150) ? T.ytBlocked : T.ytFail);
+    updateUI();
+  });
+}
+
+// Seamless hand-over YouTube -> local file at the same second.
+function switchYTtoLocal(reason) {
+  if (P.mode !== 'yt') return Promise.resolve();
+  var id = P.id, t = ytNow(), was = ytPlaying() || reason === 'offline';
+  destroyYT(); P.mode = null;
+  savePos(id, t);
+  return getTrack(id).then(function (tr) {
+    if (tr && tr.cached) {
+      toast(reason === 'offline' ? T.switched : T.switchedReady);
+      return playLocal(tr, t, was);
+    }
+    P.waitCache = true;
+    toast(T.notCached); updateUI();
+  });
+}
+
+/* ---------- unified controls ---------- */
+function isPlaying() {
+  if (P.mode === 'media') return !P.el.paused && !P.el.ended;
+  if (P.mode === 'yt') return ytPlaying();
+  return false;
+}
+function curTime() { return P.mode === 'media' ? P.el.currentTime : P.mode === 'yt' ? P.ytLast : 0; }
+function duration() {
+  if (P.mode === 'media') return isFinite(P.el.duration) ? P.el.duration : 0;
+  if (P.mode === 'yt') { try { return P.yt.getDuration() || 0; } catch (e) { return 0; } }
+  return 0;
+}
+function doPlay() {
+  if (P.mode === 'media') { P.el.play().catch(function () { toast(T.playErr); }); }
+  else if (P.mode === 'yt') { try { P.yt.playVideo(); } catch (e) {} }
+  else if (P.id) loadTrack(P.id, true);
+  else toast(T.pick);
+}
+function doPause() {
+  if (P.mode === 'media') P.el.pause();
+  else if (P.mode === 'yt') { try { P.yt.pauseVideo(); } catch (e) {} }
+}
+function seekTo(t) {
+  var d = duration(); t = Math.max(0, d ? Math.min(t, d - 1) : t);
+  if (P.mode === 'media') P.el.currentTime = t;
+  else if (P.mode === 'yt') { try { P.yt.seekTo(t, true); P.ytLast = t; } catch (e) {} }
+  updateTime();
+}
+function seekBy(d) { if (P.mode) seekTo(curTime() + d); }
+
+function updateUI() {
+  var playing = isPlaying();
+  var pb = $('#playBtn');
+  pb.disabled = !P.id;
+  pb.textContent = playing ? T.pause : T.play;
+  $('#backBtn').disabled = $('#fwdBtn').disabled = !P.mode;
+  $('#fsBtn').hidden = !(P.mode === 'media' && P.el === videoEl);
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+}
+var seeking = false;
+function updateTime() {
+  var c = curTime(), d = duration(), s = $('#seek');
+  s.max = Math.floor(d) || 0;
+  if (!seeking) s.value = Math.floor(c);
+  $('#cur').textContent = fmt(c);
+  $('#dur').textContent = d ? fmt(d) : '--:--';
+}
+
+// HTML5 media events (shared by <audio> and <video>)
+[audioEl, videoEl].forEach(function (el) {
+  el.addEventListener('play', updateUI);
+  // readyState guard: ignore stray events from a track that is being unloaded/loaded
+  el.addEventListener('pause', function () { if (P.el === el && el.readyState > 0) { savePos(P.id, el.currentTime); updateUI(); renderList(); } });
+  el.addEventListener('timeupdate', function () {
+    if (P.el !== el || el.readyState === 0) return;
+    var sec = Math.floor(el.currentTime);
+    if (sec !== P.lastSec) { P.lastSec = sec; updateTime(); }          // UI at most once per second
+    if (Date.now() - P.lastSave > 10000) { P.lastSave = Date.now(); savePos(P.id, el.currentTime); }
+  });
+  el.addEventListener('ended', function () { if (P.el === el) { savePos(P.id, 0); toast(T.ended); updateUI(); } });
+  el.addEventListener('error', function () { if (P.el === el && el.getAttribute('src')) toast(T.playErr); });
+});
+
+/* ===================== Background YouTube caching ===================== */
+var DL = { queue: [], running: null, ctrl: null, cancel: false, requeue: null, tries: {} };
+
+// urgent = grandma just tapped this talk: put it first. A running download is paused (not parallel!)
+// and goes back into the queue; it later resumes from its last saved 2 MB piece.
+function enqueue(id, urgent) {
+  if (DL.running === id) return;
+  var i = DL.queue.indexOf(id);
+  if (!urgent) { if (i < 0) DL.queue.push(id); pump(); return; }
+  if (i >= 0) DL.queue.splice(i, 1);
+  DL.queue.unshift(id);
+  if (DL.running) { DL.requeue = DL.running; DL.cancel = true; if (DL.ctrl) DL.ctrl.abort(); }
+  else pump();
+}
+function cancelDl(id) {
+  DL.queue = DL.queue.filter(function (x) { return x !== id; });
+  if (DL.running === id) { DL.requeue = null; DL.cancel = true; if (DL.ctrl) DL.ctrl.abort(); }
+  delete dlState[id];
+}
+function resumeDownloads() {
+  tracks.forEach(function (t) { if (t.source === 'youtube' && !t.cached) enqueue(t.id); });
+}
+
+function pump() {
+  if (DL.running || !DL.queue.length || !navigator.onLine) return;
+  var id = DL.queue.shift();
+  DL.running = id; DL.cancel = false;
+  cacheYouTube(id).then(function () { DL.tries[id] = 0; }, function (e) {
+    if (DL.cancel) {
+      if (DL.requeue === id) { DL.queue.splice(1, 0, id); setDl(id, T.queued); }   // paused for a tapped talk
+      return;
+    }
+    if (e && e.name === 'QuotaExceededError') { setDl(id, T.noSpace, true); toast(T.noSpace); }
+    else if (!navigator.onLine) setDl(id, T.waitNet);
+    else {
+      var n = (DL.tries[id] || 0) + 1; DL.tries[id] = n;
+      setDl(id, T.dlFail, true, e && e.message ? String(e.message).slice(0, 160) : '');
+      if (n < 4) setTimeout(function () { enqueue(id); }, 30000 * n);   // auto retry with back-off
+    }
+  }).then(function () {
+    DL.running = null; DL.ctrl = null; DL.requeue = null;
+    setTimeout(pump, 300);
+  });
+}
+
+function checkCancel() { if (DL.cancel) throw new Error('cancelled'); }
+
+function getJob(jobId) {
+  return fetchT(apiBase() + '/api/status/' + encodeURIComponent(jobId), { cache: 'no-store' }, 20000)
+    .then(function (r) {
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error('server ' + r.status);
+      return r.json();
+    });
+}
+
+async function cacheYouTube(id) {
+  var tr = await getTrack(id);
+  if (!tr || tr.cached) return;
+  var api = apiBase();
+  var dl = tr.dl || { bytes: 0, n: 0 };
+  setDl(id, T.connecting);
+
+  // 1) Make sure the server has (or is making) the file.
+  var job = dl.jobId ? await getJob(dl.jobId) : null;
+  if (!job) {
+    if (dl.bytes || dl.n) await delChunks(id);               // old partial data belongs to a lost job
+    var r = await fetchT(api + '/api/prepare', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://www.youtube.com/watch?v=' + tr.ytId, type: tr.kind })
+    }, 90000);                                                // free servers may need ~1 min to wake up
+    if (!r.ok) throw new Error((await r.json().catch(function () { return {}; })).error || ('server ' + r.status));
+    job = await r.json();
+    dl = { jobId: job.id, bytes: 0, n: 0 };
+    await patch(id, { dl: dl });
+  }
+  checkCancel();
+
+  // 2) Wait for the server download.
+  while (job.status !== 'ready') {
+    if (job.status === 'error') {                             // next retry asks the server for a fresh job
+      await patch(id, { dl: { jobId: null, bytes: 0, n: 0 } });
+      throw new Error(job.error || 'server error');
+    }
+    setDl(id, T.serverPrep + (job.progress ? ' ' + Math.floor(job.progress) + '%' : ''));
+    await sleep(3000); checkCancel();
+    job = await getJob(dl.jobId);
+    if (!job) throw new Error('job lost');
+  }
+
+  // 3) Stream to IndexedDB in 2 MB pieces, resuming from the last saved byte.
+  var mime = job.mime || tr.mime;
+  var total = job.size || 0;
+  if (!(total && dl.bytes >= total)) {
+    DL.ctrl = new AbortController();
+    var headers = dl.bytes > 0 ? { Range: 'bytes=' + dl.bytes + '-' } : {};
+    var res = await fetch(api + '/api/file/' + encodeURIComponent(job.id), { headers: headers, signal: DL.ctrl.signal, cache: 'no-store' });
+    if (res.status === 404) { await patch(id, { dl: { jobId: null, bytes: 0, n: 0 } }); throw new Error('file expired'); }
+    if (!res.ok) throw new Error('download ' + res.status);
+    if (dl.bytes > 0 && res.status !== 206) {                 // server ignored Range -> start over
+      await delChunks(id); dl.bytes = 0; dl.n = 0;
+    }
+    if (!total) total = dl.bytes + Number(res.headers.get('Content-Length') || 0);
+
+    var reader = res.body.getReader();
+    var parts = [], partLen = 0, bytes = dl.bytes, n = dl.n, lastPct = -1;
+    while (true) {
+      var step = await reader.read();
+      checkCancel();
+      if (step.done) break;
+      parts.push(step.value); partLen += step.value.byteLength;
+      if (partLen >= CHUNK) {
+        await saveChunk(id, n, new Blob(parts), bytes + partLen);
+        bytes += partLen; n++;
+        parts = []; partLen = 0;                              // drop the RAM buffer right away
+        var pct = total ? Math.floor(bytes * 100 / total) : 0;
+        if (pct !== lastPct) { lastPct = pct; setDl(id, T.saving + ' ' + pct + '% (' + mb(bytes) + ' / ' + mb(total) + ' MB)'); }
+      }
+    }
+    if (partLen) { await saveChunk(id, n, new Blob(parts), bytes + partLen); bytes += partLen; }
+    parts = null; reader = null; res = null;
+    if (total && bytes < total) throw new Error('incomplete');
+  }
+
+  // 4) Done.
+  await patch(id, { cached: true, mime: mime, dl: null });
+  delete dlState[id];
+  await refresh();
+  toast((findTrack(id) || {}).title + ' — ' + T.cached);
+  if (P.id === id) {
+    if (P.mode === 'yt') switchYTtoLocal('ready');                  // lighter: drop the iframe
+    else if (!P.mode && P.waitCache) { var t2 = await getTrack(id); playLocal(t2, t2.position || 0, true); }
+  }
+}
+
+/* ===================== Adding talks ===================== */
+async function saveLocalFile() {
+  var input = $('#file'), file = input.files && input.files[0];
+  if (!file) { toast(T.pickFile); return; }
+  var btn = $('#saveLocalBtn'); btn.disabled = true; btn.textContent = T.savingLocal;
+  try {
+    var mime = guessMime(file.name, file.type);
+    var id = 'local-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    var title = $('#lTitle').value.trim() || file.name.replace(/\.[^.]+$/, '');
+    var tr = { id: id, source: 'local', kind: mime.indexOf('video') === 0 ? 'video' : 'audio', title: title,
+               monk: $('#lMonk').value.trim(), mime: mime, cached: true, position: 0, added: Date.now() };
+    // The File is copied into IndexedDB by the browser (streamed to disk, not loaded into JS memory).
+    await txn(['tracks', 'chunks'], 'readwrite', function (b, t, ts, cs) {
+      cs.put({ id: id, n: 0, blob: file }); ts.put(tr);
+    });
+    input.value = ''; $('#lTitle').value = ''; $('#lMonk').value = '';   // release the File reference
+    $('#addLocal').open = false;
+    toast(T.savedLocal);
+    requestPersist();
+    await refresh();
+    showStorage();
+  } catch (e) {
+    toast(e && e.name === 'QuotaExceededError' ? T.noSpace : T.playErr);
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 ဖုန်းထဲ သိမ်းမည်';
+  }
+}
+
+function fetchThumb(id, vid) {   // ~4 KB jpeg stored as data URL so it shows offline too
+  return fetchT(apiBase() + '/api/thumb/' + vid, {}, 10000)
+    .then(function (r) { if (!r.ok) throw 0; return r.blob(); })
+    .then(function (b) {
+      if (b.size > 60000) return;
+      return new Promise(function (res) {
+        var fr = new FileReader();
+        fr.onload = function () { res(fr.result); };
+        fr.onerror = function () { res(null); };
+        fr.readAsDataURL(b);
+      });
+    })
+    .then(function (data) { if (data) return patch(id, { thumb: data }).then(refresh); })
+    .catch(function () {});
+}
+
+/* ===================== Suggested talks (online only) =====================
+   Only metadata is fetched. Nothing is downloaded until grandma taps a talk:
+   then it streams immediately (YouTube) AND goes first in the one-at-a-time download queue. */
+var SUG = { items: [], loading: false, last: 0, key: '' };
+var SUG_MAX = 16;
+
+async function loadSuggestions(force) {
+  if (!navigator.onLine || SUG.loading) { renderSuggestions(); return; }
+  if (!force && SUG.items.length && Date.now() - SUG.last < 5 * 60e3) { renderSuggestions(); return; }
+  SUG.loading = true;
+  if (!SUG.items.length) { $('#sugMsg').textContent = T.sugLoading; renderSuggestions(); }
+  try {
+    var r = await fetchT(apiBase() + '/api/suggestions', { cache: 'no-store' }, 120000);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    SUG.items = (d.items || []).filter(function (x) { return /^[A-Za-z0-9_-]{11}$/.test(x.id); }).slice(0, 60);
+    SUG.last = Date.now();
+    $('#sugMsg').textContent = '';
+  } catch (e) {
+    if (!SUG.items.length) $('#sugMsg').textContent = T.sugFail;
+  } finally {
+    SUG.loading = false;
+    renderSuggestions();
+  }
+}
+
+function renderSuggestions() {
+  var sec = $('#sugSec'), ul = $('#sugList');
+  if (!navigator.onLine) {                                  // offline: hide and free the thumbnails' memory
+    sec.hidden = true;
+    if (SUG.key) { ul.innerHTML = ''; SUG.key = ''; }
+    return;
+  }
+  sec.hidden = false;
+  var have = {};
+  tracks.forEach(function (t) { if (t.ytId) have[t.ytId] = 1; });
+  var list = SUG.items.filter(function (x) { return !have[x.id]; }).slice(0, SUG_MAX);
+  var key = list.map(function (x) { return x.id; }).join(',');
+  if (key === SUG.key) return;                              // unchanged: don't re-decode images
+  SUG.key = key;
+  ul.innerHTML = list.map(function (x) {
+    return '<li class="item"><button class="item-main" data-sug="' + esc(x.id) + '">' +
+      // 120x90 thumbnail (~4 KB): far lighter on RAM than the bigger ones
+      '<img class="thumb" loading="lazy" decoding="async" alt="" src="https://i.ytimg.com/vi/' + esc(x.id) + '/default.jpg">' +
+      '<span class="item-text"><b>' + esc(x.title) + '</b>' +
+      '<span class="meta">' + (x.duration ? '⏱ ' + fmt(x.duration) + (x.channel ? ' · ' : '') : '') + esc(x.channel || '') + '</span>' +
+      '<span class="pill play">' + T.listen + '</span></span></button></li>';
+  }).join('');
+  if (!list.length && SUG.items.length && !SUG.loading) $('#sugMsg').textContent = T.sugAllSaved;
+}
+
+async function playSuggestion(vid) {
+  var x = null;
+  for (var i = 0; i < SUG.items.length; i++) if (SUG.items[i].id === vid) x = SUG.items[i];
+  if (!x) return;
+  var id = 'yt-' + vid + '-audio';                          // audio only: ~22 MB/hour on the phone
+  var tr = await getTrack(id);
+  if (!tr) {
+    tr = { id: id, source: 'youtube', ytId: vid, kind: 'audio', title: x.title || 'YouTube', monk: x.channel || '',
+           mime: 'audio/mp4', cached: false, position: 0, duration: x.duration || 0, added: Date.now(), suggested: true };
+    await putTrack(tr);
+  }
+  await refresh();                                          // moves it into "Saved" with a download badge
+  if (!tr.cached) enqueue(id, true);                        // download this one first
+  requestPersist();
+  window.scrollTo(0, 0);
+  await loadTrack(id, true);                                // streams now; switches to the phone copy when saved
+  fetchThumb(id, vid);
+}
+
+/* ===================== Catalog auto-sync =====================
+   Runs on app open, when the internet comes back, and when the app returns to the foreground.
+   New catalog talks are queued into the existing downloader, which runs strictly ONE at a time. */
+var SYNC = { running: false, last: 0 };
+function catLocalId(c) {
+  var vid = parseYouTubeId(c && c.youtubeUrl);
+  return vid ? 'yt-' + vid + '-' + (c.mediaType === 'video' ? 'video' : 'audio') : null;
+}
+function setSyncInfo(s) { $('#syncInfo').textContent = s; }
+
+async function syncCatalog() {
+  if (SYNC.running || !navigator.onLine) return;
+  SYNC.running = true; setSyncInfo(T.syncing);
+  var newThumbs = [];
+  try {
+    var r = await fetchT(apiBase() + '/api/catalog', { cache: 'no-store' }, 90000);   // free servers may be waking up
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var list = await r.json();
+    if (!Array.isArray(list)) throw new Error('bad catalog');
+    await refresh();
+    var inCatalog = {}, added = 0;
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i], id = catLocalId(c);
+      if (!id) continue;
+      inCatalog[id] = 1;
+      var tr = findTrack(id);
+      if (!tr) {
+        var kind = c.mediaType === 'video' ? 'video' : 'audio';
+        await putTrack({ id: id, source: 'youtube', ytId: parseYouTubeId(c.youtubeUrl), kind: kind,
+          title: c.title || 'YouTube', monk: c.monk || '', mime: kind === 'video' ? 'video/mp4' : 'audio/mp4',
+          cached: false, position: 0, added: Date.parse(c.addedAt) || Date.now(), catalog: true });
+        added++; newThumbs.push(id);
+      } else if (!tr.catalog || tr.removed || (c.title && c.title !== tr.title) || (c.monk && c.monk !== tr.monk)) {
+        await patch(id, { catalog: true, removed: false, title: c.title || tr.title, monk: c.monk || tr.monk || '' });
+      }
+    }
+    // Talks the admin removed: keep anything already saved (or playing) and just mark it;
+    // drop only unfinished downloads. An EMPTY catalog is treated as "server was reset" -> touch nothing.
+    if (list.length) {
+      for (var j = 0; j < tracks.length; j++) {
+        var t = tracks[j];
+        if (!t.catalog || inCatalog[t.id]) continue;
+        if (t.cached || t.id === P.id) { if (!t.removed) await patch(t.id, { removed: true }); }
+        else { cancelDl(t.id); await deleteTrack(t.id); }
+      }
+    }
+    await refresh();
+    SYNC.last = Date.now();
+    setSyncInfo(T.synced + new Date().toLocaleTimeString() + ' · ' + list.length + ' talks');
+    if (added) { toast(T.newTalks(added)); requestPersist(); }
+    resumeDownloads();                                    // sequential queue (one talk at a time)
+    for (var k = 0; k < newThumbs.length; k++) {          // tiny thumbnails, one by one
+      var tt = findTrack(newThumbs[k]);
+      if (tt) await fetchThumb(tt.id, tt.ytId);
+    }
+    if (location.hash === '#admin' && ADMIN.pin) loadCatalogAdmin();
+  } catch (e) {
+    setSyncInfo(T.syncFail + (e && e.message ? e.message : ''));
+  } finally {
+    SYNC.running = false;
+    resumeDownloads();
+  }
+}
+
+/* ===================== Admin view (#admin or 5 taps on ⚙) ===================== */
+var ADMIN = { pin: null };
+function ssGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+function ssSet(k, v) { try { if (v) sessionStorage.setItem(k, v); else sessionStorage.removeItem(k); } catch (e) {} }
+
+async function adminFetch(path, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({ 'x-admin-pin': ADMIN.pin || '' }, opts.headers || {});
+  var r = await fetchT(apiBase() + path, opts, 90000);
+  var d = await r.json().catch(function () { return {}; });
+  if (!r.ok) { var e = new Error(d.error || ('HTTP ' + r.status)); e.status = r.status; throw e; }
+  return d;
+}
+function adminLogout(msg) {
+  ADMIN.pin = null; ssSet('pin', '');
+  $('#pinInput').value = '';
+  $('#pinBox').hidden = false; $('#adminPanel').hidden = true;
+  if (msg) toast(msg);
+}
+async function adminLogin(pin) {
+  ADMIN.pin = pin;
+  try {
+    var d = await adminFetch('/api/admin/check');
+    ssSet('pin', pin);
+    $('#pinInput').value = '';
+    $('#pinBox').hidden = true; $('#adminPanel').hidden = false;
+    $('#catInfo').textContent = 'Server file: ' + d.catalogFile;
+    loadCatalogAdmin();
+    loadSourcesAdmin();
+  } catch (e) {
+    adminLogout(e.status === 401 ? T.badPin : e.message);
+  }
+}
+async function loadCatalogAdmin() {
+  try {
+    var r = await fetchT(apiBase() + '/api/catalog', { cache: 'no-store' }, 90000);
+    renderCatalog(await r.json());
+  } catch (e) { $('#catList').textContent = T.serverBad; }
+}
+function renderCatalog(list) {
+  $('#cCount').textContent = '(' + list.length + ')';
+  $('#catList').innerHTML = list.length ? list.map(function (c) {
+    var local = findTrack(catLocalId(c));
+    return '<div class="cat"><div class="cat-text"><b>' + (c.mediaType === 'video' ? '🎬 ' : '🎧 ') + esc(c.title) + '</b><br>' +
+      '<span class="hint">' + (c.monk ? esc(c.monk) + ' · ' : '') + esc(String(c.addedAt || '').slice(0, 10)) + ' · ' +
+      (local && local.cached ? T.onPhone : T.notOnPhone) + '</span></div>' +
+      '<button class="btn light" data-cdel="' + esc(c.id) + '">🗑 Remove</button></div>';
+  }).join('') : '<p class="hint">' + T.catEmpty + '</p>';
+}
+async function addToCatalog() {
+  var url = $('#cUrl').value.trim();
+  if (!parseYouTubeId(url)) { toast(T.badLink); return; }
+  var typeEl = document.querySelector('input[name=cType]:checked');
+  var btn = $('#cAddBtn'), label = btn.textContent;
+  btn.disabled = true; btn.textContent = T.fetchingTitle;
+  try {
+    var item = await adminFetch('/api/catalog', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ youtubeUrl: url, title: $('#cTitle').value.trim(), monk: $('#cMonk').value.trim(),
+                             mediaType: typeEl && typeEl.value === 'video' ? 'video' : 'audio' })
+    });
+    $('#cUrl').value = ''; $('#cTitle').value = ''; $('#cMonk').value = '';
+    toast(T.catAdded + item.title);
+    await loadCatalogAdmin();
+    syncCatalog();                      // if this is grandma's phone, start downloading right away
+  } catch (e) {
+    if (e.status === 401) adminLogout(T.badPin); else toast('⚠ ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+async function removeFromCatalog(id) {
+  if (!confirm(T.catConfirmDel)) return;
+  try {
+    await adminFetch('/api/catalog/' + encodeURIComponent(id), { method: 'DELETE' });
+    toast(T.catRemoved);
+    await loadCatalogAdmin();
+    syncCatalog();
+  } catch (e) {
+    if (e.status === 401) adminLogout(T.badPin); else toast('⚠ ' + e.message);
+  }
+}
+/* ----- Admin: suggestion sources ----- */
+async function loadSourcesAdmin() {
+  try { renderSources(await adminFetch('/api/sources')); }
+  catch (e) { if (e.status === 401) adminLogout(T.badPin); else $('#srcList').textContent = '⚠ ' + e.message; }
+}
+function renderSources(d) {
+  var st = {};
+  (d.status || []).forEach(function (s) { st[s.id] = s; });
+  $('#srcList').innerHTML = d.sources.length ? d.sources.map(function (s) {
+    var x = st[s.id];
+    return '<div class="cat"><div class="cat-text"><b>' + esc(s.label) + '</b><br><span class="hint">' + esc(s.url) + '<br>' +
+      (x ? (x.ok ? '✓ ' + x.count + ' talks' : '⚠ ' + esc(x.error || 'error') + ' (' + x.count + ' cached)') : '⏳ …') +
+      '</span></div><button class="btn light" data-sdel="' + esc(s.id) + '">🗑 Remove</button></div>';
+  }).join('') : '<p class="hint">—</p>';
+  $('#srcInfo').textContent = d.updatedAt ? T.sugUpdated + new Date(d.updatedAt).toLocaleString() : '';
+}
+async function addSource() {
+  var url = $('#sUrl').value.trim();
+  if (!url) return;
+  var btn = $('#sAddBtn'); btn.disabled = true;
+  try {
+    await adminFetch('/api/sources', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url, label: $('#sLabel').value.trim() }) });
+    $('#sUrl').value = ''; $('#sLabel').value = '';
+    toast(T.srcAdded);
+    loadSourcesAdmin();
+  } catch (e) { if (e.status === 401) adminLogout(T.badPin); else toast('⚠ ' + e.message); }
+  finally { btn.disabled = false; }
+}
+async function removeSource(id) {
+  if (!confirm(T.srcConfirmDel)) return;
+  try { await adminFetch('/api/sources/' + encodeURIComponent(id), { method: 'DELETE' }); loadSourcesAdmin(); }
+  catch (e) { if (e.status === 401) adminLogout(T.badPin); else toast('⚠ ' + e.message); }
+}
+async function refreshSuggestionsNow() {
+  var btn = $('#sRefreshBtn'), label = btn.textContent;
+  btn.disabled = true; btn.textContent = T.sugLoading;
+  try {
+    await adminFetch('/api/suggestions/refresh', { method: 'POST' });
+    await loadSourcesAdmin();
+    loadSuggestions(true);
+  } catch (e) { if (e.status === 401) adminLogout(T.badPin); else toast('⚠ ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+
+function route() {
+  var on = location.hash === '#admin';
+  document.body.classList.toggle('admin', on);
+  $('#admin').hidden = !on;
+  if (on) {
+    window.scrollTo(0, 0);
+    showStorage();
+    if (ADMIN.pin) { loadCatalogAdmin(); loadSourcesAdmin(); }
+    else if (ssGet('pin')) adminLogin(ssGet('pin'));
+  }
+}
+
+function removeTrack(id) {
+  if (!confirm(T.confirmDel)) return;
+  if (P.id === id) {
+    stopCurrent(false); P.id = null; P.token++;
+    $('#np').hidden = true; $('#npEmpty').hidden = false; lsSet('last', '');
+    updateUI(); updateTime();
+  }
+  cancelDl(id);
+  deleteTrack(id).then(refresh).then(showStorage);
+}
+
+/* ===================== Wiring ===================== */
+$('#playBtn').addEventListener('click', function () { isPlaying() ? doPause() : doPlay(); });
+$('#backBtn').addEventListener('click', function () { seekBy(-15); });
+$('#fwdBtn').addEventListener('click', function () { seekBy(15); });
+$('#fsBtn').addEventListener('click', function () { if (videoEl.requestFullscreen) videoEl.requestFullscreen().catch(function () {}); });
+$('#seek').addEventListener('input', function () { seeking = true; $('#cur').textContent = fmt(+this.value); });
+$('#seek').addEventListener('change', function () { seeking = false; seekTo(+this.value); });
+$('#saveLocalBtn').addEventListener('click', saveLocalFile);
+// Admin wiring
+var gearTaps = [];
+$('#gearBtn').addEventListener('click', function () {
+  var now = Date.now();
+  gearTaps = gearTaps.filter(function (t) { return now - t < 3000; });
+  gearTaps.push(now);
+  if (gearTaps.length >= 5) { gearTaps = []; location.hash = '#admin'; }
+});
+$('#homeBtn').addEventListener('click', function () {
+  history.replaceState(null, '', location.pathname + location.search); route();
+});
+$('#pinBtn').addEventListener('click', function () { var p = $('#pinInput').value.trim(); if (p) adminLogin(p); });
+$('#pinInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#pinBtn').click(); });
+$('#logoutBtn').addEventListener('click', function () { adminLogout(); });
+$('#cAddBtn').addEventListener('click', addToCatalog);
+$('#catList').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-cdel]'); if (b) removeFromCatalog(b.getAttribute('data-cdel'));
+});
+$('#sAddBtn').addEventListener('click', addSource);
+$('#sRefreshBtn').addEventListener('click', refreshSuggestionsNow);
+$('#srcList').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-sdel]'); if (b) removeSource(b.getAttribute('data-sdel'));
+});
+$('#sugList').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-sug]');
+  if (b) playSuggestion(b.getAttribute('data-sug')).catch(function () { toast(T.ytFail); });
+});
+$('#syncBtn').addEventListener('click', function () {
+  if (!navigator.onLine) { toast(T.offline); return; }
+  syncCatalog();
+});
+window.addEventListener('hashchange', route);
+$('#file').addEventListener('change', function () {
+  var f = this.files && this.files[0];
+  if (f && !$('#lTitle').value) $('#lTitle').value = f.name.replace(/\.[^.]+$/, '');
+});
+$('#list').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-act]'); if (!b) return;
+  var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+  if (act === 'play') {
+    if (P.id === id && P.mode) { isPlaying() ? doPause() : doPlay(); return; }
+    loadTrack(id, true); window.scrollTo(0, 0);
+  } else if (act === 'del') removeTrack(id);
+  else if (act === 'retry') { DL.tries[id] = 0; delete dlState[id]; renderList(); enqueue(id); }
+});
+
+$('#apiUrl').value = lsGet('api') || '';
+$('#saveApiBtn').addEventListener('click', function () {
+  lsSet('api', $('#apiUrl').value.trim()); toast(T.saved); syncCatalog();
+});
+$('#testApiBtn').addEventListener('click', function () {
+  var base = ($('#apiUrl').value.trim() || DEFAULT_API).replace(/\/+$/, '');
+  fetchT(base + '/health', {}, 60000).then(function (r) { toast(r.ok ? T.serverOk : T.serverBad); })
+    .catch(function () { toast(T.serverBad); });
+});
+$('#settings').addEventListener('toggle', function () { if (this.open) showStorage(); });
+
+// Lock-screen / notification controls
+if ('mediaSession' in navigator) {
+  var ms = navigator.mediaSession;
+  try {
+    ms.setActionHandler('play', doPlay);
+    ms.setActionHandler('pause', doPause);
+    ms.setActionHandler('seekbackward', function () { seekBy(-15); });
+    ms.setActionHandler('seekforward', function () { seekBy(15); });
+  } catch (e) {}
+}
+
+// Online / offline switching
+window.addEventListener('offline', function () {
+  updateBadge(); renderList();
+  if (DL.ctrl) DL.ctrl.abort();                 // fail fast; resumes later from the last saved piece
+  switchYTtoLocal('offline');
+  renderSuggestions();                          // hides the online-only section
+});
+window.addEventListener('online', function () {
+  updateBadge(); renderList();
+  setTimeout(syncCatalog, 2000);                // fetch catalog, then resume the download queue
+  loadSuggestions();
+});
+
+// Save position when the app is hidden or closed; re-check the catalog when it comes back
+function saveNow() { if (P.id && P.mode) savePos(P.id, curTime()); }
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) saveNow();
+  else { if (Date.now() - SYNC.last > 5 * 60e3) syncCatalog(); loadSuggestions(); }
+});
+window.addEventListener('pagehide', saveNow);
+
+// Install button
+var deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredPrompt = e; $('#installBtn').hidden = false; });
+$('#installBtn').addEventListener('click', function () {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.finally(function () { deferredPrompt = null; $('#installBtn').hidden = true; requestPersist(); });
+});
+
+// Service worker (app shell offline)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function () {});
+  navigator.serviceWorker.addEventListener('controllerchange', function () { updateBadge(); warmFontCache(); });
+  warmFontCache();
+}
+
+// Start
+updateBadge();
+route();
+refresh().then(function () {
+  requestPersist();
+  var last = lsGet('last'), tr = last && findTrack(last);
+  if (tr) { P.id = tr.id; showNP(tr); $('#cur').textContent = fmt(tr.position); updateUI(); }   // one tap to resume
+  syncCatalog();                                // background: new talks from the admin catalog
+  loadSuggestions();                            // online-only feed (metadata only)
+}).catch(function () { toast('IndexedDB error'); });
+</script>
+</body>
+</html>
