@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#5a2d00">
+<meta name="theme-color" content="#FAF8F5">
 <meta name="color-scheme" content="light">
 <title>ဓမ္မ နားထောင်ရန်</title>
 <link rel="manifest" href="manifest.json">
@@ -13,151 +13,229 @@
 <link rel="stylesheet" crossorigin="anonymous" media="print" onload="this.media='all'"
       href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;700&display=swap">
 <style>
-  /* Plain, flat, high-contrast. No animations, blur, gradients or shadows (cheap for a 2GB phone). */
+  /* Serene, warm and calm. Light on a 2 GB phone: no blur, no JS animation, only cheap transform/opacity transitions. */
   :root {
-    --bg: #fffaf0; --card: #ffffff; --fg: #111111; --muted: #3d3d3d; --line: #b9a27a;
-    --pri: #5a2d00; --pri-fg: #ffffff; --ok-bg: #0b6b2e; --warn-bg: #8a4b00; --off-bg: #6b0b0b;
+    --bg: #FAF8F5; --card: #FFFFFF; --fg: #1E1B18; --muted: #6B635B; --line: #ECE6DE; --soft: #F4EFE8;
+    --pri: #C26D1F; --pri-ink: #9A5214; --pri-soft: #FBF0E4;
+    --ok: #2E7D5B; --ok-soft: #E5F2EB; --dl: #2A5F9E; --dl-soft: #E8F0FA; --err: #B3261E; --err-soft: #FBEAE8;
+    --r: 16px; --r-lg: 20px;
+    --shadow: 0 1px 2px rgba(30, 27, 24, .05), 0 4px 14px rgba(30, 27, 24, .06);
+    --ph: 0px;                      /* height of the bottom player (set by JS) */
   }
   * { box-sizing: border-box; }
-  /* Text scales with the screen: ~17px on small phones, 19px max on big screens */
-  html { font-size: clamp(16px, calc(3.4vw + 5px), 19px); -webkit-text-size-adjust: 100%; }
+  html { font-size: clamp(17px, calc(2.2vw + 10px), 19px); -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0; background: var(--bg); color: var(--fg); line-height: 1.65;
+    margin: 0; background: var(--bg); color: var(--fg); line-height: 1.6;
     font-family: "Noto Sans Myanmar", "Myanmar Text", "Padauk", "Pyidaungsu", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    padding-bottom: calc(var(--ph) + 24px);
   }
-  header, main { max-width: 640px; margin: 0 auto; padding: 10px 12px; }
-  h1 { font-size: 1.35rem; margin: 4px 0 8px; color: var(--pri); }
-  h2 { font-size: 1.15rem; margin: 0 0 8px; }
-  .badge { display: block; padding: 10px 14px; border-radius: 10px; font-weight: 700; color: #fff; font-size: 1rem; }
-  .badge.ok { background: var(--ok-bg); }
-  .badge.warn { background: var(--warn-bg); }
-  .net { margin: 6px 0 0; font-weight: 700; font-size: 1rem; }
-  .net.off { color: var(--off-bg); }
-  .card { background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 12px; margin: 0 0 14px; }
-  .btn {
-    display: block; width: 100%; min-height: 60px; margin: 8px 0; padding: 8px 10px;
-    font: inherit; font-size: 1.05rem; font-weight: 700; line-height: 1.45;
-    color: var(--pri-fg); background: var(--pri); border: 3px solid var(--pri); border-radius: 14px;
-    cursor: pointer; touch-action: manipulation;
-  }
-  .btn:active { background: #000; }
-  .btn:disabled { background: #9a9a9a; border-color: #9a9a9a; }
-  .btn.big { min-height: 80px; font-size: 1.45rem; }
-  .btn.light { background: #fff; color: var(--pri); }
-  .btn.small { min-height: 56px; font-size: 1rem; }
+  .wrap { max-width: 540px; margin: 0 auto; padding: 0 16px; }
+  button { font: inherit; touch-action: manipulation; cursor: pointer; }
+  button:disabled { cursor: default; }
+
+  /* ---------- Top bar ---------- */
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0 8px; }
+  h1 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 1.3rem; line-height: 1.3; min-width: 0; }
+  #appTitle { -webkit-user-select: none; user-select: none; touch-action: manipulation; cursor: default; }
+  #appTitle > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .logo { flex: none; width: 40px; height: 40px; border-radius: 13px; background: var(--pri); color: #fff;
+          display: grid; place-items: center; font-size: 1.35rem; }
+  .status { flex: none; padding: 6px 12px; border-radius: 999px; font-size: .82rem; font-weight: 700; white-space: nowrap; }
+  .status.ok { background: var(--ok-soft); color: var(--ok); }
+  .status.on { background: #EDF0F4; color: #3B4B5E; }
+  .status.off { background: var(--err-soft); color: var(--err); }
+  .netline { margin: 4px 0 0; padding: 10px 14px; border-radius: var(--r); background: var(--err-soft); color: var(--err);
+             font-weight: 700; font-size: .92rem; }
+
+  /* ---------- Install banner ---------- */
+  .install { position: relative; margin: 14px 0 0; padding: 16px; border-radius: var(--r-lg);
+             background: var(--pri-soft); border: 1px solid #F1DCC4; }
+  .install p { margin: 0 52px 12px 0; font-size: .95rem; color: #5B3B1C; }
+  .install .x { position: absolute; top: 8px; right: 8px; width: 48px; height: 48px; border: 0; border-radius: 14px;
+                background: transparent; color: #8A6A4A; font-size: 1.2rem; }
+
+  /* ---------- Sections ---------- */
+  .sec { margin: 26px 0 0; }
+  .sec-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 0 4px 4px; }
+  h2 { margin: 0; font-size: 1.15rem; line-height: 1.45; }
+  .h-en { font-size: .8rem; color: var(--muted); font-weight: 700; }
+  .sec-sub { margin: 0 4px 14px; font-size: .9rem; color: var(--muted); }
+  .empty { padding: 22px 18px; border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow);
+           text-align: center; color: var(--muted); }
+
+  /* ---------- Video / YouTube stage ---------- */
+  #stage { position: relative; margin: 16px 0 0; border-radius: var(--r-lg); overflow: hidden; background: #000; box-shadow: var(--shadow); }
+  #ytBox iframe { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border: 0; }
+  video { display: block; width: 100%; max-height: 46vh; background: #000; }
+  #fsBtn { position: absolute; right: 10px; bottom: 10px; min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px;
+           background: rgba(0, 0, 0, .7); color: #fff; font-size: .85rem; font-weight: 700; }
+
+  /* ---------- Talk cards ---------- */
+  #list, #sugList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .item { position: relative; background: var(--card); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+  .item.current { box-shadow: inset 0 0 0 3px var(--pri), var(--shadow); }
+  .item-main { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 92px; margin: 0; padding: 14px 64px 14px 14px;
+               text-align: left; color: inherit; background: none; border: 0; transition: background-color .15s; }
+  .item-main:active { background: var(--soft); }
+  .art { position: relative; flex: none; width: 64px; height: 64px; border-radius: 14px; overflow: hidden;
+         background: var(--soft); display: grid; place-items: center; font-size: 1.7rem; }
+  .art img { width: 100%; height: 100%; object-fit: cover; }
+  .art .state { position: absolute; right: 4px; bottom: 4px; width: 26px; height: 26px; border-radius: 50%;
+                background: rgba(30, 27, 24, .78); color: #fff; font-size: .7rem; display: grid; place-items: center; }
+  .item.current .art .state { background: var(--pri); }
+  .item-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  .item-text b { font-size: 1.02rem; line-height: 1.5; word-break: break-word;
+                 display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .item-text .who { font-size: .88rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .pill { display: inline-flex; align-items: center; padding: 1px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700;
+          line-height: 1.7; white-space: nowrap; }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.dl { background: var(--dl-soft); color: var(--dl); }
+  .pill.err { background: var(--err-soft); color: var(--err); }
+  .pill.meta { background: var(--soft); color: #5A524A; font-weight: 600; }
+  .pill.play { background: var(--pri-soft); color: var(--pri-ink); padding: 3px 14px; font-size: .88rem; }
+  .del { position: absolute; top: 10px; right: 8px; width: 52px; height: 52px; border: 0; border-radius: 14px;
+         background: transparent; color: #A39A90; font-size: 1.15rem; }
+  .del:active { background: var(--err-soft); color: var(--err); }
+  .prog { display: block; height: 5px; margin: -6px 14px 12px 92px; border-radius: 3px; background: var(--soft); overflow: hidden; }
+  .prog i { display: block; height: 100%; background: var(--pri); border-radius: 3px; }
+  .item-actions { display: flex; gap: 8px; padding: 0 14px 14px; justify-content: flex-end; }
+  .item-actions .btn { width: auto; min-height: 48px; margin: 0; padding: 4px 16px; font-size: .9rem; }
+  .item .admin-only { font-size: .8rem; color: var(--muted); }
+  /* Grandma view: no retry/technical details */
+  body:not(.admin) .item-actions, body:not(.admin) .admin-only { display: none !important; }
+
+  /* Suggested talks: 16:9 thumbnails */
+  #sugList .item-main { padding: 12px; gap: 12px; }
+  .sthumb { position: relative; flex: none; width: 128px; height: 72px; border-radius: 12px; overflow: hidden; background: #2B2723; }
+  .sthumb img { width: 100%; height: 100%; object-fit: cover; }
+  .sthumb .dur { position: absolute; right: 5px; bottom: 5px; padding: 0 6px; border-radius: 6px; background: rgba(0, 0, 0, .78);
+                 color: #fff; font-size: .72rem; font-weight: 700; line-height: 1.6; }
+  #sugList .item-text b { -webkit-line-clamp: 3; font-size: .98rem; }
+  #sugList .badges { margin-top: 6px; }
+  #sugList .item.busy .pill.play { background: var(--dl-soft); color: var(--dl); }
+
+  /* ---------- Add local file (tucked away) ---------- */
+  .ghost { display: block; width: 100%; min-height: 56px; margin: 14px 0 0; border: 2px dashed #DCD2C6; border-radius: var(--r);
+           background: transparent; color: var(--muted); font-weight: 700; font-size: .95rem; }
+  .ghost:active { background: var(--soft); }
+
+  /* ---------- Generic card / buttons / forms (admin + local file panel) ---------- */
+  .card { background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: 16px; margin: 14px 0 0; }
+  .btn { display: block; width: 100%; min-height: 56px; margin: 10px 0 0; padding: 8px 14px; border: 0; border-radius: var(--r);
+         background: var(--pri); color: #fff; font-size: 1rem; font-weight: 700; line-height: 1.45; transition: transform .1s; }
+  .btn:active { transform: scale(.98); }
+  .btn:disabled { background: #C9C2BA; }
+  .btn.light { background: var(--card); color: var(--pri-ink); box-shadow: inset 0 0 0 2px #E8DCCD; }
+  .btn.small { min-height: 52px; font-size: .95rem; }
   .row { display: flex; gap: 10px; }
   .row .btn { flex: 1; }
-  .np-title { font-size: 1.2rem; font-weight: 700; word-break: break-word; }
-  .np-monk { font-size: 1.05rem; color: var(--muted); }
-  .np-src { font-size: 0.95rem; font-weight: 700; margin-top: 4px; }
-  #ytBox { margin: 10px 0; background: #000; }
-  #ytBox iframe { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border: 0; }
-  video { display: block; width: 100%; max-height: 42vh; background: #000; margin: 10px 0; }
-  .seek { margin: 10px 0 4px; }
-  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 48px; margin: 0; background: transparent; }
-  input[type=range]::-webkit-slider-runnable-track { height: 12px; background: #d9cbb0; border-radius: 6px; }
+  #admin h2 { margin-bottom: 6px; }
+  h3 { font-size: 1.05rem; margin: 22px 0 4px; }
+  details { margin: 10px 0 0; }
+  summary { min-height: 52px; padding: 10px 0; font-size: 1.02rem; font-weight: 700; color: var(--pri-ink); cursor: pointer; }
+  .cat { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .cat-text { flex: 1; min-width: 0; word-break: break-word; font-size: .92rem; }
+  .cat .btn { flex: none; width: auto; min-height: 48px; margin: 0; padding: 4px 14px; font-size: .88rem; }
+  label { display: block; margin: 14px 0 0; font-weight: 700; font-size: .95rem; }
+  input[type=text], input[type=url], input[type=password], input[type=file] {
+    display: block; width: 100%; margin-top: 6px; padding: 12px 14px; font: inherit; font-size: 1rem;
+    border: 2px solid #DDD3C7; border-radius: 14px; background: #fff; color: var(--fg);
+  }
+  input:focus { outline: none; border-color: var(--pri); }
+  fieldset { border: 0; padding: 0; margin: 12px 0 0; }
+  .radio { display: flex; align-items: center; gap: 10px; min-height: 56px; margin: 6px 0 0; padding: 6px 14px;
+           border: 2px solid var(--line); border-radius: 14px; font-weight: 700; }
+  .radio input { width: 26px; height: 26px; accent-color: var(--pri); }
+  .hint { margin: 8px 0 0; font-size: .86rem; color: var(--muted); overflow-wrap: anywhere; }
+  #listEmpty { margin: 0; }
+
+  /* ---------- Bottom player sheet ---------- */
+  #player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; background: var(--card);
+            border-radius: 24px 24px 0 0; box-shadow: 0 -4px 24px rgba(30, 27, 24, .13);
+            padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+            transform: translateY(110%); transition: transform .22s ease-out; visibility: hidden; }
+  body.has-player #player { transform: none; visibility: visible; }
+  .p-in { max-width: 540px; margin: 0 auto; }
+  .grab { width: 40px; height: 5px; margin: 0 auto 8px; border-radius: 3px; background: #E3DBD1; }
+  .np-row { display: flex; align-items: center; gap: 12px; }
+  .np-art { flex: none; width: 52px; height: 52px; border-radius: 14px; overflow: hidden; background: var(--soft);
+            display: grid; place-items: center; font-size: 1.5rem; }
+  .np-art img { width: 100%; height: 100%; object-fit: cover; }
+  .np-text { min-width: 0; flex: 1; }
+  #npTitle { font-weight: 700; font-size: 1rem; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #npMonk { font-size: .85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+  .np-meta .pill { font-size: .74rem; }
+  .seek { margin: 6px 0 0; }
+  input[type=range] { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 40px; margin: 0;
+                      background: transparent; --pct: 0%; }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--pri) var(--pct), #EBE4DB var(--pct)); }
   input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 38px; height: 38px; margin-top: -13px;
-    border-radius: 50%; background: var(--pri); border: 4px solid #fff; outline: 2px solid var(--pri);
-  }
-  .time { text-align: center; font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-  #list, #sugList { list-style: none; margin: 0; padding: 0; }
-  .item { border: 2px solid var(--line); border-radius: 12px; margin: 0 0 12px; overflow: hidden; }
-  .item.current { border-color: var(--pri); border-width: 4px; }
-  .item-main {
-    display: flex; gap: 10px; align-items: center; width: 100%; padding: 8px; text-align: left;
-    font: inherit; color: var(--fg); background: #fff; border: 0; cursor: pointer;
-  }
-  .thumb { flex: none; width: 84px; height: 48px; object-fit: cover; background: #222; border-radius: 6px; }
-  .ico { flex: none; width: 84px; height: 48px; display: flex; align-items: center; justify-content: center;
-         font-size: 1.7rem; background: #f1e6d0; border-radius: 6px; }
-  .item-text { display: flex; flex-direction: column; min-width: 0; }
-  .item-text b { font-size: 1.05rem; line-height: 1.55; word-break: break-word; }
-  .item-text span { font-size: 0.9rem; color: var(--muted); }
-  .st { font-weight: 700; }
-  .st.ok { color: var(--ok-bg); }
-  .st.err { color: var(--off-bg); }
-  .item-actions { display: flex; gap: 8px; padding: 0 10px 10px; justify-content: flex-end; }
-  .item-actions .btn { min-height: 52px; margin: 0; font-size: 0.95rem; }
-  .item-actions .btn[data-act=del] { flex: none; width: auto; padding: 6px 18px; }
-  /* Grandma view: no delete/retry buttons, no technical details */
-  body:not(.admin) .item-actions, body:not(.admin) .admin-only { display: none !important; }
-  .item-text .pill {
-    align-self: flex-start; margin-top: 4px; padding: 2px 12px; border-radius: 8px;
-    color: #fff; font-weight: 700; font-size: 0.95rem;
-  }
-  .pill.ok { background: var(--ok-bg); }
-  .pill.dl { background: #1f4e8c; }
-  .pill.err { background: var(--off-bg); }
-  .pill.play { background: var(--pri); font-size: 1rem; padding: 3px 14px; }
-  .h-en { font-size: 0.85rem; color: var(--muted); font-weight: 700; white-space: nowrap; }
-  .sub { font-size: 1rem; color: var(--muted); margin: 0 0 10px; }
-  #sugSec { border-color: var(--pri); }
-  /* long YouTube titles: max 3 lines so cards stay short and easy to scan */
-  #sugList .item-text b { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  #sugList .meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .item-text .admin-only { font-size: 0.85rem; }
-  .hdr { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  /* Title doubles as the hidden admin entrance (5 quick taps) – looks like plain text */
-  #appTitle { -webkit-user-select: none; user-select: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; cursor: default; }
+    -webkit-appearance: none; width: 28px; height: 28px; margin-top: -10px; border-radius: 50%;
+    background: var(--pri); border: 4px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .3); }
+  input[type=range]::-moz-range-track { height: 8px; border-radius: 4px; background: #EBE4DB; }
+  input[type=range]::-moz-range-progress { height: 8px; border-radius: 4px; background: var(--pri); }
+  input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--pri); border: 4px solid #fff; }
+  .times { display: flex; justify-content: space-between; margin-top: -4px; font-size: .82rem; font-weight: 700;
+           color: var(--muted); font-variant-numeric: tabular-nums; }
+  .controls { display: flex; align-items: center; justify-content: center; gap: 26px; margin-top: 4px; }
+  .skip { width: 72px; height: 60px; border: 0; border-radius: 18px; background: var(--soft); color: var(--fg);
+          display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; transition: transform .1s; }
+  .skip .i { font-size: 1.25rem; }
+  .skip .t { font-size: .72rem; font-weight: 700; color: var(--muted); }
+  #playBtn { width: 72px; height: 72px; border: 0; border-radius: 50%; background: var(--pri); color: #fff; font-size: 1.8rem;
+             display: grid; place-items: center; box-shadow: 0 6px 16px rgba(194, 109, 31, .35); transition: transform .1s; }
+  .skip:active, #playBtn:active { transform: scale(.94); }
+  .skip:disabled, #playBtn:disabled { opacity: .45; box-shadow: none; }
+
+  /* ---------- Toast (sits above the player) ---------- */
+  #toast { position: fixed; left: 12px; right: 12px; bottom: calc(var(--ph) + 14px); z-index: 9; max-width: 516px; margin: 0 auto;
+           padding: 14px 16px; border-radius: var(--r); background: #2A2520; color: #fff; font-weight: 700; font-size: .98rem;
+           box-shadow: 0 6px 20px rgba(0, 0, 0, .2); pointer-events: none; }
+
   /* Admin view never renders unless unlocked (#admin or ?admin=1) */
   body:not(.admin) #admin { display: none !important; }
-  #installBtn { margin: 10px 0 0; }
-  h3 { font-size: 1.1rem; margin: 20px 0 4px; }
-  details { margin: 8px 0; }
-  .cat { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
-  .cat-text { flex: 1; min-width: 0; word-break: break-word; font-size: 0.95rem; }
-  .cat .btn { flex: none; width: auto; min-height: 48px; margin: 0; padding: 4px 14px; font-size: 0.9rem; }
-  summary { font-size: 1.15rem; font-weight: 700; min-height: 56px; padding: 8px 0; cursor: pointer; color: var(--pri); }
-  label { display: block; margin: 12px 0 0; font-weight: 700; }
-  input[type=text], input[type=url], input[type=file] {
-    display: block; width: 100%; margin-top: 6px; padding: 12px; font: inherit; font-size: 1.05rem;
-    border: 2px solid #555; border-radius: 10px; background: #fff; color: #000;
-  }
-  fieldset { border: 0; padding: 0; margin: 12px 0 0; }
-  .radio { display: flex; align-items: center; gap: 10px; min-height: 56px; font-weight: 700; margin: 4px 0;
-           border: 2px solid var(--line); border-radius: 10px; padding: 6px 12px; }
-  .radio input { width: 28px; height: 28px; accent-color: var(--pri); }
-  .hint { font-size: 0.9rem; color: var(--muted); margin: 6px 0 0; overflow-wrap: anywhere; }
-  #toast {
-    position: fixed; left: 12px; right: 12px; bottom: 16px; max-width: 616px; margin: 0 auto; z-index: 9;
-    padding: 14px 16px; border-radius: 12px; background: #111; color: #fff; font-weight: 700; font-size: 1.05rem;
-    pointer-events: none;   /* never block taps on the buttons underneath */
-  }
-  /* Small phones (≤380px): give the titles more room */
+  #homeBtn { margin-top: 16px; }
+
+  /* Small phones */
   @media (max-width: 380px) {
-    header, main { padding: 8px 8px; }
-    .card { padding: 10px 8px; border-radius: 12px; }
-    .item-main { gap: 8px; padding: 6px; }
-    .thumb, .ico { width: 64px; height: 36px; }
-    .ico { font-size: 1.35rem; }
-    .row { gap: 8px; }
-    .h-en { white-space: normal; }
+    .wrap { padding: 0 12px; }
+    h1 { font-size: 1.1rem; gap: 8px; }
+    .logo { width: 34px; height: 34px; font-size: 1.15rem; border-radius: 11px; }
+    .status { padding: 5px 10px; font-size: .74rem; }
+    .item-main { gap: 12px; padding: 12px 58px 12px 12px; }
+    .art { width: 56px; height: 56px; }
+    .prog { margin-left: 80px; }
+    .sthumb { width: 104px; height: 58px; }
+    .controls { gap: 18px; }
   }
-  /* Tablets / desktop: wider page, talks in two columns */
-  @media (min-width: 900px) {
-    header, main { max-width: 1000px; }
-    #list, #sugList { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
-    #list .item, #sugList .item { margin: 0; }
-    .thumb, .ico { width: 112px; height: 63px; }
-    #ytBox, video { max-width: 720px; margin-left: auto; margin-right: auto; }
-  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<header>
+<div class="wrap">
+<header class="topbar">
   <!-- Admin: open the page with #admin or ?admin=1, or tap this title 5 times within 3 seconds -->
-  <h1 id="appTitle">☸ ဓမ္မ နားထောင်ရန်</h1>
-  <div id="badge" class="badge warn">⏳ ပြင်ဆင်နေသည်…</div>
-  <div id="net" class="net"></div>
-  <button id="installBtn" class="btn" hidden>📲 ဖုန်းထဲသို့ App အဖြစ် သွင်းမည်</button>
+  <h1 id="appTitle"><span class="logo" aria-hidden="true">☸</span><span>ဓမ္မ နားထောင်ရန်</span></h1>
+  <span id="badge" class="status on">📶 Online</span>
 </header>
+<div id="net" class="netline" hidden></div>
+
+<!-- Install banner: only when Chrome says the app can be installed -->
+<div id="installCard" class="install" hidden>
+  <p>📲 ဖုန်း Home Screen မှ တိုက်ရိုက်ဖွင့်ပြီး အင်တာနက်မလိုဘဲ နားထောင်နိုင်ပါသည်။</p>
+  <button id="installDismiss" class="x" aria-label="ပိတ်မည်">✕</button>
+  <button id="installBtn" class="btn">📲 ဖုန်းထဲသို့ App အဖြစ် သွင်းမည်</button>
+</div>
 
 <main>
-  <!-- ===== Admin view (hidden from grandma) ===== -->
   <section id="admin" hidden>
-    <button id="homeBtn" class="btn">← အဘွားမျက်နှာပြင်သို့ ပြန်သွားမည် (Exit Admin)</button>
+    <button id="homeBtn" class="btn light">← အဘွားမျက်နှာပြင်သို့ ပြန်သွားမည် (Exit Admin)</button>
     <div class="card">
       <h2>🔐 Admin – Remote Catalog</h2>
       <div id="pinBox">
@@ -207,19 +285,6 @@
       <h2>📱 ဤဖုန်း (This phone)</h2>
       <button id="syncBtn" class="btn small">🔄 ယခု Sync လုပ်မည် (Sync now)</button>
       <p id="syncInfo" class="hint"></p>
-      <details id="addLocal">
-        <summary>📁 တရားဖိုင် အသစ်ထည့်မည် (Add Local File)</summary>
-        <label>ဖိုင် ရွေးပါ (MP3 / M4A / MP4)
-          <input id="file" type="file" accept="audio/*,video/mp4,.mp3,.m4a,.mp4,.aac">
-        </label>
-        <label>တရားခေါင်းစဉ် (Title)
-          <input id="lTitle" type="text" autocomplete="off">
-        </label>
-        <label>ဆရာတော် ဘွဲ့အမည် (Monk)
-          <input id="lMonk" type="text" autocomplete="off">
-        </label>
-        <button id="saveLocalBtn" class="btn">💾 ဖုန်းထဲ သိမ်းမည်</button>
-      </details>
       <details id="settings">
         <summary>⚙ Server</summary>
         <label>ဆာဗာ လိပ်စာ (Server URL)
@@ -232,49 +297,73 @@
         </div>
         <p id="storageInfo" class="hint"></p>
       </details>
-      <p class="hint">ဖုန်းထဲက တရားကို ဖျက်ရန် အောက်ပါစာရင်းရှိ 🗑 ကို နှိပ်ပါ။</p>
+      <p class="hint">ဖုန်းထဲက တရားကို ဖျက်ရန် စာရင်းရှိ 🗑 ကို နှိပ်ပါ။ ပြန်မကြိုးစားနိုင်သော ဒေါင်းလုဒ်များကို 🔄 ဖြင့် ပြန်စနိုင်သည်။</p>
     </div>
   </section>
 
-  <!-- Player -->
-  <section class="card" aria-label="Player">
-    <div id="npEmpty">👇 နားထောင်လိုသော တရားကို အောက်ပါစာရင်းမှ နှိပ်ပါ</div>
-    <div id="np" hidden>
-      <div id="npTitle" class="np-title"></div>
-      <div id="npMonk" class="np-monk"></div>
-      <div id="npSrc" class="np-src"></div>
-    </div>
+  <!-- Video / YouTube picture (audio talks from the phone need no picture) -->
+  <section id="stage" hidden>
     <div id="ytBox" hidden></div>
     <video id="video" playsinline preload="metadata" hidden></video>
-    <audio id="audio" preload="metadata"></audio>
-    <div class="seek">
-      <input id="seek" type="range" min="0" max="0" step="1" value="0" aria-label="Position">
-      <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
-    </div>
-    <button id="playBtn" class="btn big" disabled>▶ ဖွင့်မည်</button>
-    <div class="row">
-      <button id="backBtn" class="btn" disabled>⏪ ၁၅ စက္ကန့် နောက်သို့</button>
-      <button id="fwdBtn" class="btn" disabled>၁၅ စက္ကန့် ရှေ့သို့ ⏩</button>
-    </div>
-    <button id="fsBtn" class="btn light small" hidden>⛶ မျက်နှာပြင်အပြည့် ကြည့်မည်</button>
+    <button id="fsBtn" hidden>⛶ မျက်နှာပြင်အပြည့်</button>
   </section>
 
-  <!-- Library -->
-  <section class="card">
-    <h2>💾 သိမ်းထားပြီးသား တရားတော်များ <span class="h-en">(Saved Offline)</span></h2>
-    <p class="sub">အင်တာနက် မရှိလည်း အချိန်မရွေး နားထောင်နိုင်သည်။</p>
+  <!-- Saved talks -->
+  <section class="sec" aria-labelledby="savedH">
+    <div class="sec-h"><h2 id="savedH">💾 သိမ်းထားပြီးသား တရားတော်များ</h2><span class="h-en">(Saved Offline)</span></div>
+    <p class="sec-sub">အင်တာနက် မရှိလည်း အချိန်မရွေး နားထောင်နိုင်သည်။</p>
     <ul id="list"></ul>
-    <p id="listEmpty" hidden>တရားတော်များ မကြာမီ ရောက်ရှိလာပါမည်။ 🙏</p>
+    <p id="listEmpty" class="empty" hidden>တရားတော်များ မကြာမီ ရောက်ရှိလာပါမည်။ 🙏</p>
+    <button id="addLocalBtn" class="ghost">📁 ဖုန်းထဲက တရားဖိုင် ထည့်မည်</button>
+    <div id="localPanel" class="card" hidden>
+      <label>ဖိုင် ရွေးပါ (MP3 / M4A / MP4)
+        <input id="file" type="file" accept="audio/*,video/mp4,.mp3,.m4a,.mp4,.aac">
+      </label>
+      <label>တရားခေါင်းစဉ်
+        <input id="lTitle" type="text" autocomplete="off">
+      </label>
+      <label>ဆရာတော် ဘွဲ့အမည်
+        <input id="lMonk" type="text" autocomplete="off">
+      </label>
+      <button id="saveLocalBtn" class="btn">💾 ဖုန်းထဲ သိမ်းမည်</button>
+      <button id="localCancel" class="btn light small">မထည့်တော့ပါ</button>
+    </div>
   </section>
 
   <!-- Suggestions: online only. Nothing is downloaded until a talk is tapped. -->
-  <section class="card" id="sugSec" hidden>
-    <h2>✨ နားထောင်ရန် အကြံပြုချက်များ <span class="h-en">(Suggested Talks)</span></h2>
-    <p class="sub">နှိပ်လိုက်လျှင် ချက်ချင်းဖွင့်ပေးပြီး ဖုန်းထဲသို့လည်း သိမ်းပေးပါမည်။</p>
-    <p id="sugMsg" class="sub"></p>
+  <section class="sec" id="sugSec" hidden aria-labelledby="sugH">
+    <div class="sec-h"><h2 id="sugH">✨ အကြံပြု တရားတော်များ</h2><span class="h-en">(Suggested Talks)</span></div>
+    <p class="sec-sub">နှိပ်လိုက်လျှင် ချက်ချင်းဖွင့်ပေးပြီး ဖုန်းထဲသို့လည်း သိမ်းပေးပါမည်။</p>
+    <p id="sugMsg" class="sec-sub"></p>
     <ul id="sugList"></ul>
   </section>
 </main>
+</div>
+
+<!-- Bottom player sheet (shown once a talk is chosen) -->
+<section id="player" aria-label="Player">
+  <div class="p-in">
+    <div class="grab" aria-hidden="true"></div>
+    <div class="np-row">
+      <div id="npArt" class="np-art">🎧</div>
+      <div class="np-text">
+        <div id="npTitle"></div>
+        <div id="npMonk"></div>
+        <div class="np-meta"><span id="npSrc" class="pill meta"></span><span id="npDl" class="pill dl" hidden></span></div>
+      </div>
+    </div>
+    <audio id="audio" preload="metadata"></audio>
+    <div class="seek">
+      <input id="seek" type="range" min="0" max="0" step="1" value="0" aria-label="Position">
+      <div class="times"><span id="cur">0:00</span><span id="dur">--:--</span></div>
+    </div>
+    <div class="controls">
+      <button id="backBtn" class="skip" disabled aria-label="၁၅ စက္ကန့် နောက်သို့"><span class="i">⏪</span><span class="t">၁၅ စက္ကန့်</span></button>
+      <button id="playBtn" disabled aria-label="ဖွင့်မည်">▶</button>
+      <button id="fwdBtn" class="skip" disabled aria-label="၁၅ စက္ကန့် ရှေ့သို့"><span class="i">⏩</span><span class="t">၁၅ စက္ကန့်</span></button>
+    </div>
+  </div>
+</section>
 
 <div id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -284,22 +373,22 @@
 // Put your backend URL here (or set it in #admin → Server). '' = same server that serves this page.
 // On Vercel (no yt-dlp there) the page uses the VPS backend; everywhere else the same server.
 var DEFAULT_API = /\.vercel\.app$/.test(location.hostname) ? 'https://150.95.27.200.sslip.io' : '';
-var CHUNK = 2 * 1024 * 1024;   // downloads are saved in 2 MB pieces -> RAM never holds the whole file
+var CHUNK = 1024 * 1024;       // downloads are saved in 1 MB pieces -> RAM never holds the whole file,
+                               // and a dropped connection on slow mobile data loses at most 1 MB
+var STALL_MS = 30000;          // no bytes for this long = dead connection (mobile networks often hang silently)
 
 var T = {
-  ready: '✓ အင်တာနက်မလိုဘဲ နားထောင်နိုင်သည် (Offline Ready)',
-  preparing: '⏳ Offline အတွက် ပြင်ဆင်နေသည်…',
-  needFile: '⏳ တရားဖိုင် သိမ်းပြီးမှ Offline နားထောင်နိုင်မည်',
-  online: '🌐 အင်တာနက် ရှိသည်',
+  ready: '🟢 Offline Ready', online: '📶 Online', offlineShort: '📴 Offline',
   offline: '📴 အင်တာနက် မရှိပါ — ဖုန်းထဲက တရားများ ဖွင့်နိုင်သည်',
-  play: '▶ ဖွင့်မည်', pause: '⏸ ခဏရပ်မည်',
+  play: 'ဖွင့်မည်', pause: 'ခဏရပ်မည်',
   cached: 'Offline Ready ✓',
   onlineOnly: '🌐 အင်တာနက်ဖြင့်သာ ဖွင့်နိုင်သေးသည်',
   queued: '⏳ ဒေါင်းလုဒ်ဆွဲရန် စောင့်နေသည်',
   waitNet: '📴 အင်တာနက် ပြန်ရလျှင် ဆက်ဒေါင်းမည်',
-  connecting: '⬇ ဒေါင်းလုဒ်ဆွဲနေသည်...',
-  serverPrep: '⬇ ဒေါင်းလုဒ်ဆွဲနေသည်... (ပြင်ဆင်နေ)',
-  saving: '⬇ ဒေါင်းလုဒ်ဆွဲနေသည်...',
+  connecting: '⬇ ဒေါင်းလုဒ် စတင်နေသည်',
+  serverPrep: '⬇ ပြင်ဆင်နေသည်',
+  saving: '⬇ ဖုန်းထဲ သိမ်းနေသည်',
+  reconnect: '🔄 လိုင်း ပြန်ချိတ်နေသည်…',
   removedMark: '(Catalog မှ ဖယ်ထားသည် — ဖုန်းထဲတွင် ဆက်ရှိသည်)',
   newTalks: function (n) { return '🙏 တရားတော်အသစ် ' + n + ' ပုဒ် ရောက်ရှိလာပါပြီ'; },
   syncing: '🔄 Catalog စစ်နေသည်…',
@@ -312,7 +401,7 @@ var T = {
   catEmpty: 'Catalog ထဲတွင် တရား မရှိသေးပါ။',
   catConfirmDel: 'Catalog မှ ဖယ်မှာ သေချာပါသလား? (ဖုန်းထဲ သိမ်းပြီးသားဖိုင်ကို မဖျက်ပါ)',
   onPhone: '📱 ဖုန်းထဲရှိ ✓', notOnPhone: '📱 မရှိသေး',
-  listen: '▶ နားထောင်မည်',
+  listen: '▶ နားထောင်မည်', opening: '⏳ ဖွင့်နေသည်…',
   sugLoading: '⏳ အကြံပြုချက်များ ရှာနေသည်…',
   sugFail: 'အကြံပြုချက်များ ယခု မရနိုင်သေးပါ။ နောက်မှ ပြန်ကြည့်ပါ။',
   sugAllSaved: '✓ အကြံပြုထားသော တရားအားလုံး ဖုန်းထဲ ရှိပြီးပါပြီ။',
@@ -324,8 +413,8 @@ var T = {
   retry: '🔄 ပြန်ကြိုးစားမည်',
   del: '🗑 ဖျက်မည်',
   confirmDel: 'ဤတရားကို ဖုန်းထဲမှ ဖျက်မှာ သေချာပါသလား?',
-  srcLocal: '📱 ဖုန်းထဲမှ ဖွင့်နေသည် (Offline)',
-  srcYT: '🌐 YouTube မှ ဖွင့်နေသည် (Online)',
+  srcLocal: '📱 ဖုန်းထဲမှ (Offline)',
+  srcYT: '🌐 YouTube မှ (Online)',
   switched: 'အင်တာနက် ပြတ်သွားသဖြင့် ဖုန်းထဲက ဖိုင်ဖြင့် ဆက်ဖွင့်နေသည်',
   switchedReady: 'ဖုန်းထဲ သိမ်းပြီးပါပြီ — ဖုန်းထဲက ဖိုင်ဖြင့် ဆက်ဖွင့်နေသည်',
   notCached: 'ဤတရားကို ဖုန်းထဲ မသိမ်းရသေးပါ။ အင်တာနက် ပြန်ရမှ ဖွင့်နိုင်မည်။',
@@ -492,7 +581,7 @@ function findTrack(id) { for (var i = 0; i < tracks.length; i++) if (tracks[i].i
 function refresh() {
   return allTracks().then(function (list) {
     tracks = (list || []).sort(function (a, b) { return b.added - a.added; });
-    renderList(); updateBadge(); renderSuggestions();
+    renderList(); updateBadge(); renderSuggestions(); if (P.id) showDl();
   });
 }
 
@@ -501,34 +590,54 @@ function statusHtml(t) {
   if (t.source !== 'youtube') return '';
   var s = dlState[t.id];
   var text = s ? s.text : (navigator.onLine ? T.queued : T.waitNet);
-  return '<span class="st pill ' + (s && s.err ? 'err' : 'dl') + '" data-st="' + esc(t.id) + '">' + esc(text) + '</span>' +
-    (s && s.detail ? '<span class="admin-only">' + esc(s.detail) + '</span>' : '');
+  return '<span class="st pill ' + (s && s.err ? 'err' : 'dl') + '" data-st="' + esc(t.id) + '">' + esc(text) + '</span>';
+}
+function artHtml(t) {
+  return t.thumb ? '<img alt="" decoding="async" src="' + esc(t.thumb) + '">' : (t.kind === 'video' ? '🎬' : '🎧');
 }
 
 function renderList() {
   var html = '';
   for (var i = 0; i < tracks.length; i++) {
-    var t = tracks[i], id = esc(t.id);
-    var pic = t.thumb ? '<img class="thumb" alt="" src="' + esc(t.thumb) + '">'
-                      : '<span class="ico">' + (t.kind === 'video' ? '🎬' : '🎧') + '</span>';
-    var pos = t.position > 5 ? '<span>' + T.stoppedAt + fmt(t.position) + (t.duration ? ' / ' + fmt(t.duration) : '') + '</span>' : '';
-    var s = dlState[t.id];
-    html += '<li class="item' + (t.id === P.id ? ' current' : '') + '">' +
-      '<button class="item-main" data-act="play" data-id="' + id + '">' + pic +
+    var t = tracks[i], id = esc(t.id), s = dlState[t.id];
+    var cur = t.id === P.id, playing = cur && isPlaying();
+    var pct = t.duration > 0 && t.position > 5 ? Math.min(100, Math.round(t.position * 100 / t.duration)) : 0;
+    html += '<li class="item' + (cur ? ' current' : '') + '" data-li="' + id + '">' +
+      '<button class="item-main" data-act="play" data-id="' + id + '">' +
+      '<span class="art">' + artHtml(t) + '<span class="state">' + (playing ? '⏸' : '▶') + '</span></span>' +
       '<span class="item-text"><b>' + (t.kind === 'video' ? '🎬 ' : '') + esc(t.title) + '</b>' +
-      (t.monk ? '<span>' + esc(t.monk) + '</span>' : '') + pos + statusHtml(t) +
+      (t.monk ? '<span class="who">' + esc(t.monk) + '</span>' : '') +
+      '<span class="badges">' + statusHtml(t) +
+      (t.duration ? '<span class="pill meta">⏱ ' + fmt(t.duration) + '</span>' : '') +
+      (t.size && t.cached ? '<span class="pill meta">' + mb(t.size) + ' MB</span>' : '') +
+      (t.position > 5 && !pct ? '<span class="pill meta">' + T.stoppedAt + fmt(t.position) + '</span>' : '') +
+      '</span>' +
+      (s && s.detail ? '<span class="admin-only">' + esc(s.detail) + '</span>' : '') +
       (t.removed ? '<span class="admin-only">' + T.removedMark + '</span>' : '') + '</span></button>' +
-      '<div class="item-actions">' +
-      (s && s.err ? '<button class="btn small" data-act="retry" data-id="' + id + '">' + T.retry + '</button>' : '') +
-      '<button class="btn small light" data-act="del" data-id="' + id + '">' + T.del + '</button></div></li>';
+      '<button class="del" data-act="del" data-id="' + id + '" aria-label="' + T.del + '">🗑</button>' +
+      (pct ? '<span class="prog" title="' + T.stoppedAt + fmt(t.position) + '"><i style="width:' + pct + '%"></i></span>' : '') +
+      (s && s.err ? '<div class="item-actions"><button class="btn small" data-act="retry" data-id="' + id + '">' + T.retry + '</button></div>' : '') +
+      '</li>';
   }
   $('#list').innerHTML = html;
   $('#listEmpty').hidden = tracks.length > 0;
 }
 
+// Cheap per-second/per-state update of the "now playing" highlight (no list re-render, no image re-decode).
+function markCurrent() {
+  var playing = isPlaying(), lis = document.querySelectorAll('#list .item');
+  for (var i = 0; i < lis.length; i++) {
+    var cur = lis[i].getAttribute('data-li') === P.id;
+    lis[i].classList.toggle('current', cur);
+    var st = lis[i].querySelector('.state');
+    if (st) st.textContent = cur && playing ? '⏸' : '▶';
+  }
+}
+
 function setDl(id, text, err, detail) {
   var prev = dlState[id];
   dlState[id] = { text: text, err: !!err, detail: detail || '' };
+  if (id === P.id) showDl();
   var el = document.querySelector('[data-st="' + CSS.escape(id) + '"]');
   if (!el || err || !!(prev && prev.err) !== !!err) { renderList(); return; }   // retry button / details change
   el.textContent = text;
@@ -538,11 +647,12 @@ function updateBadge() {
   var swReady = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
   var anyCached = tracks.some(function (t) { return t.cached; });
   var b = $('#badge');
-  if (swReady && anyCached) { b.className = 'badge ok'; b.textContent = T.ready; }
-  else { b.className = 'badge warn'; b.textContent = swReady ? T.needFile : T.preparing; }
+  if (swReady && anyCached) { b.className = 'status ok'; b.textContent = T.ready; }
+  else if (navigator.onLine) { b.className = 'status on'; b.textContent = T.online; }
+  else { b.className = 'status off'; b.textContent = T.offlineShort; }
   var n = $('#net');
-  n.textContent = navigator.onLine ? T.online : T.offline;
-  n.className = navigator.onLine ? 'net' : 'net off';
+  n.textContent = T.offline;
+  n.hidden = navigator.onLine;
 }
 
 function showStorage() {
@@ -559,21 +669,43 @@ function showStorage() {
 var audioEl = $('#audio'), videoEl = $('#video');
 var P = { id: null, mode: null, el: null, url: null, yt: null, ytTimer: 0, ytLast: 0, token: 0, waitCache: false, lastSave: 0, lastSec: -1 };
 
+// Bottom sheet height -> page padding + toast position (so nothing hides behind the player)
+function setPh() {
+  var on = document.body.classList.contains('has-player');
+  document.documentElement.style.setProperty('--ph', on ? $('#player').offsetHeight + 'px' : '0px');
+}
 function showNP(tr) {
-  $('#npEmpty').hidden = true; $('#np').hidden = false;
+  document.body.classList.add('has-player');
   $('#npTitle').textContent = tr.title;
   $('#npMonk').textContent = tr.monk || '';
-  $('#npSrc').textContent = '';
+  $('#npArt').innerHTML = artHtml(tr);
+  $('#npSrc').textContent = tr.cached ? T.srcLocal : '';
+  $('#npSrc').hidden = !tr.cached;
+  showDl();
+  setPh();
   if ('mediaSession' in navigator && window.MediaMetadata) {
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: tr.title, artist: tr.monk || '', artwork: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }]
+      title: tr.title, artist: tr.monk || '',
+      artwork: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }]
     });
   }
-  var items = document.querySelectorAll('.item');
-  for (var i = 0; i < items.length; i++) {
-    var btn = items[i].querySelector('.item-main');
-    items[i].classList.toggle('current', btn && btn.getAttribute('data-id') === tr.id);
-  }
+  markCurrent();
+}
+function hideNP() {
+  document.body.classList.remove('has-player');
+  setPh(); markCurrent();
+}
+// Live download/caching pill for the talk in the player
+function showDl() {
+  var t = P.id && findTrack(P.id), s = P.id && dlState[P.id], el = $('#npDl');
+  if (!t || t.cached || t.source !== 'youtube') { el.hidden = true; return; }
+  el.textContent = s ? s.text : (navigator.onLine ? T.queued : T.waitNet);
+  el.className = 'pill ' + (s && s.err ? 'err' : 'dl');
+  el.hidden = false;
+}
+function showStage() {   // scroll the video / YouTube picture into view
+  var st = $('#stage');
+  if (!st.hidden && st.scrollIntoView) st.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 // Free everything held by the current track (iframe, media buffers, blob URL).
@@ -626,7 +758,8 @@ function playLocal(tr, at, autoplay, token) {
     other.hidden = true;
     videoEl.hidden = el !== videoEl;
     P.mode = 'media'; P.el = el; P.lastSec = -1;
-    $('#npSrc').textContent = T.srcLocal;
+    $('#npSrc').textContent = T.srcLocal; $('#npSrc').hidden = false; showDl();
+    updateUI(); if (el === videoEl) showStage();
     el.addEventListener('loadedmetadata', function () {
       if (token !== P.token) return;
       if (isFinite(el.duration) && el.duration > 0) {
@@ -669,7 +802,8 @@ function playYT(tr, at, token) {
     box.innerHTML = '<div id="ytPlayer"></div>';
     box.hidden = false;
     P.mode = 'yt'; P.ytLast = at;
-    $('#npSrc').textContent = T.srcYT;
+    $('#npSrc').textContent = T.srcYT; $('#npSrc').hidden = false;
+    updateUI(); showStage();
     P.yt = new YT.Player('ytPlayer', {
       videoId: tr.ytId, width: '100%', height: '200',
       playerVars: { playsinline: 1, rel: 0, autoplay: 1, start: Math.floor(at) },
@@ -770,18 +904,23 @@ function updateUI() {
   var playing = isPlaying();
   var pb = $('#playBtn');
   pb.disabled = !P.id;
-  pb.textContent = playing ? T.pause : T.play;
+  pb.textContent = playing ? '⏸' : '▶';
+  pb.setAttribute('aria-label', playing ? T.pause : T.play);
   $('#backBtn').disabled = $('#fwdBtn').disabled = !P.mode;
   $('#fsBtn').hidden = !(P.mode === 'media' && P.el === videoEl);
+  $('#stage').hidden = $('#ytBox').hidden && videoEl.hidden;
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+  markCurrent();
 }
 var seeking = false;
 function updateTime() {
   var c = curTime(), d = duration(), s = $('#seek');
+  if (!P.mode && P.id) { var t = findTrack(P.id); if (t) { c = t.position || 0; d = t.duration || 0; } }
   s.max = Math.floor(d) || 0;
   if (!seeking) s.value = Math.floor(c);
-  $('#cur').textContent = fmt(c);
-  $('#dur').textContent = d ? fmt(d) : '--:--';
+  s.style.setProperty('--pct', (d ? Math.min(100, (seeking ? +s.value : c) * 100 / d) : 0) + '%');
+  $('#cur').textContent = fmt(seeking ? +s.value : c);
+  $('#dur').textContent = d ? '-' + fmt(Math.max(0, d - c)) : '--:--';
 }
 
 // HTML5 media events (shared by <audio> and <video>)
@@ -803,7 +942,7 @@ function updateTime() {
 var DL = { queue: [], running: null, ctrl: null, cancel: false, requeue: null, tries: {} };
 
 // urgent = grandma just tapped this talk: put it first. A running download is paused (not parallel!)
-// and goes back into the queue; it later resumes from its last saved 2 MB piece.
+// and goes back into the queue; it later resumes from its last saved 1 MB piece.
 function enqueue(id, urgent) {
   if (DL.running === id) return;
   var i = DL.queue.indexOf(id);
@@ -825,7 +964,7 @@ function resumeDownloads() {
 function pump() {
   if (DL.running || !DL.queue.length || !navigator.onLine) return;
   var id = DL.queue.shift();
-  DL.running = id; DL.cancel = false;
+  DL.running = id; DL.cancel = false; DL.progressed = false;
   cacheYouTube(id).then(function () { DL.tries[id] = 0; }, function (e) {
     if (DL.cancel) {
       if (DL.requeue === id) { DL.queue.splice(1, 0, id); setDl(id, T.queued); }   // paused for a tapped talk
@@ -833,7 +972,13 @@ function pump() {
     }
     if (e && e.name === 'QuotaExceededError') { setDl(id, T.noSpace, true); toast(T.noSpace); }
     else if (!navigator.onLine) setDl(id, T.waitNet);
-    else {
+    else if (DL.progressed) {
+      // This try saved data before the line dropped/hung: not a real failure. Resume from the
+      // last saved piece in a few seconds, and never give up while it keeps making progress.
+      DL.tries[id] = 0;
+      setDl(id, T.reconnect);
+      setTimeout(function () { enqueue(id); }, 3000);
+    } else {
       var n = (DL.tries[id] || 0) + 1; DL.tries[id] = n;
       setDl(id, T.dlFail, true, e && e.message ? String(e.message).slice(0, 160) : '');
       if (n < 4) setTimeout(function () { enqueue(id); }, 30000 * n);   // auto retry with back-off
@@ -883,48 +1028,64 @@ async function cacheYouTube(id) {
       await patch(id, { dl: { jobId: null, bytes: 0, n: 0 } });
       throw new Error(job.error || 'server error');
     }
-    setDl(id, T.serverPrep + (job.progress ? ' ' + Math.floor(job.progress) + '%' : ''));
+    setDl(id, T.serverPrep + (job.progress ? ' ' + Math.floor(job.progress) + '%' : '…'));
     await sleep(3000); checkCancel();
     job = await getJob(dl.jobId);
     if (!job) throw new Error('job lost');
   }
 
-  // 3) Stream to IndexedDB in 2 MB pieces, resuming from the last saved byte.
+  // 3) Stream to IndexedDB in 1 MB pieces, resuming from the last saved byte.
   var mime = job.mime || tr.mime;
   var total = job.size || 0;
   if (!(total && dl.bytes >= total)) {
-    DL.ctrl = new AbortController();
-    var headers = dl.bytes > 0 ? { Range: 'bytes=' + dl.bytes + '-' } : {};
-    var res = await fetch(api + '/api/file/' + encodeURIComponent(job.id), { headers: headers, signal: DL.ctrl.signal, cache: 'no-store' });
-    if (res.status === 404) { await patch(id, { dl: { jobId: null, bytes: 0, n: 0 } }); throw new Error('file expired'); }
-    if (!res.ok) throw new Error('download ' + res.status);
-    if (dl.bytes > 0 && res.status !== 206) {                 // server ignored Range -> start over
-      await delChunks(id); dl.bytes = 0; dl.n = 0;
-    }
-    if (!total) total = dl.bytes + Number(res.headers.get('Content-Length') || 0);
-
-    var reader = res.body.getReader();
-    var parts = [], partLen = 0, bytes = dl.bytes, n = dl.n, lastPct = -1;
-    while (true) {
-      var step = await reader.read();
-      checkCancel();
-      if (step.done) break;
-      parts.push(step.value); partLen += step.value.byteLength;
-      if (partLen >= CHUNK) {
-        await saveChunk(id, n, new Blob(parts), bytes + partLen);
-        bytes += partLen; n++;
-        parts = []; partLen = 0;                              // drop the RAM buffer right away
-        var pct = total ? Math.floor(bytes * 100 / total) : 0;
-        if (pct !== lastPct) { lastPct = pct; setDl(id, T.saving + ' ' + pct + '% (' + mb(bytes) + ' / ' + mb(total) + ' MB)'); }
+    var ctrl = DL.ctrl = new AbortController();
+    // Watchdog: a mobile connection can die without any error, leaving read() waiting forever.
+    // If no byte arrives for STALL_MS, abort; pump() then resumes from the last saved piece.
+    var lastByte = Date.now(), stalled = false;
+    var dog = setInterval(function () {
+      if (Date.now() - lastByte > STALL_MS) { stalled = true; ctrl.abort(); }
+    }, 5000);
+    try {
+      var headers = dl.bytes > 0 ? { Range: 'bytes=' + dl.bytes + '-' } : {};
+      var res = await fetch(api + '/api/file/' + encodeURIComponent(job.id), { headers: headers, signal: ctrl.signal, cache: 'no-store' });
+      if (res.status === 404) { await patch(id, { dl: { jobId: null, bytes: 0, n: 0 } }); throw new Error('file expired'); }
+      if (!res.ok) throw new Error('download ' + res.status);
+      if (dl.bytes > 0 && res.status !== 206) {                 // server ignored Range -> start over
+        await delChunks(id); dl.bytes = 0; dl.n = 0;
       }
+      if (!total) total = dl.bytes + Number(res.headers.get('Content-Length') || 0);
+
+      var reader = res.body.getReader();
+      var parts = [], partLen = 0, bytes = dl.bytes, n = dl.n, lastPct = -1;
+      while (true) {
+        var step = await reader.read();
+        checkCancel();
+        if (step.done) break;
+        lastByte = Date.now();
+        parts.push(step.value); partLen += step.value.byteLength;
+        if (partLen >= CHUNK) {
+          await saveChunk(id, n, new Blob(parts), bytes + partLen);
+          bytes += partLen; n++;
+          parts = []; partLen = 0;                              // drop the RAM buffer right away
+          DL.progressed = true;
+        }
+        // Show progress from bytes received (not only saved), so slow lines never look frozen.
+        var got = bytes + partLen, pct = total ? Math.floor(got * 100 / total) : 0;
+        if (pct !== lastPct) { lastPct = pct; setDl(id, T.saving + ' ' + pct + '%', false, mb(got) + ' / ' + mb(total) + ' MB'); }
+      }
+      if (partLen) { await saveChunk(id, n, new Blob(parts), bytes + partLen); bytes += partLen; DL.progressed = true; }
+      parts = null; reader = null; res = null;
+      if (total && bytes < total) throw new Error('incomplete');
+    } catch (e) {
+      if (stalled && !DL.cancel) throw new Error('connection stalled');
+      throw e;
+    } finally {
+      clearInterval(dog);
     }
-    if (partLen) { await saveChunk(id, n, new Blob(parts), bytes + partLen); bytes += partLen; }
-    parts = null; reader = null; res = null;
-    if (total && bytes < total) throw new Error('incomplete');
   }
 
   // 4) Done.
-  await patch(id, { cached: true, mime: mime, dl: null });
+  await patch(id, { cached: true, mime: mime, dl: null, size: total || undefined });
   delete dlState[id];
   await refresh();
   toast((findTrack(id) || {}).title + ' — ' + T.cached);
@@ -944,13 +1105,13 @@ async function saveLocalFile() {
     var id = 'local-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     var title = $('#lTitle').value.trim() || file.name.replace(/\.[^.]+$/, '');
     var tr = { id: id, source: 'local', kind: mime.indexOf('video') === 0 ? 'video' : 'audio', title: title,
-               monk: $('#lMonk').value.trim(), mime: mime, cached: true, position: 0, added: Date.now() };
+               monk: $('#lMonk').value.trim(), mime: mime, cached: true, position: 0, added: Date.now(), size: file.size };
     // The File is copied into IndexedDB by the browser (streamed to disk, not loaded into JS memory).
     await txn(['tracks', 'chunks'], 'readwrite', function (b, t, ts, cs) {
       cs.put({ id: id, n: 0, blob: file }); ts.put(tr);
     });
     input.value = ''; $('#lTitle').value = ''; $('#lMonk').value = '';   // release the File reference
-    $('#addLocal').open = false;
+    $('#localPanel').hidden = true; $('#addLocalBtn').hidden = false;
     toast(T.savedLocal);
     requestPersist();
     await refresh();
@@ -1020,11 +1181,12 @@ function renderSuggestions() {
   SUG.key = key;
   ul.innerHTML = list.map(function (x) {
     return '<li class="item"><button class="item-main" data-sug="' + esc(x.id) + '">' +
-      // 120x90 thumbnail (~4 KB): far lighter on RAM than the bigger ones
-      '<img class="thumb" loading="lazy" decoding="async" alt="" src="https://i.ytimg.com/vi/' + esc(x.id) + '/default.jpg">' +
+      // 320x180 thumbnail (~10 KB, lazy): sharp at card size, still light on RAM
+      '<span class="sthumb"><img loading="lazy" decoding="async" alt="" src="https://i.ytimg.com/vi/' + esc(x.id) + '/mqdefault.jpg">' +
+      (x.duration ? '<span class="dur">' + fmt(x.duration) + '</span>' : '') + '</span>' +
       '<span class="item-text"><b>' + esc(x.title) + '</b>' +
-      '<span class="meta">' + (x.duration ? '⏱ ' + fmt(x.duration) + (x.channel ? ' · ' : '') : '') + esc(x.channel || '') + '</span>' +
-      '<span class="pill play">' + T.listen + '</span></span></button></li>';
+      (x.channel ? '<span class="who">' + esc(x.channel) + '</span>' : '') +
+      '<span class="badges"><span class="pill play">' + T.listen + '</span></span></span></button></li>';
   }).join('');
   if (!list.length && SUG.items.length && !SUG.loading) $('#sugMsg').textContent = T.sugAllSaved;
 }
@@ -1033,6 +1195,8 @@ async function playSuggestion(vid) {
   var x = null;
   for (var i = 0; i < SUG.items.length; i++) if (SUG.items[i].id === vid) x = SUG.items[i];
   if (!x) return;
+  var card = document.querySelector('#sugList [data-sug="' + CSS.escape(vid) + '"]');   // instant feedback
+  if (card) { card.parentNode.classList.add('busy'); card.querySelector('.pill').textContent = T.opening; }
   var id = 'yt-' + vid + '-audio';                          // audio only: ~22 MB/hour on the phone
   var tr = await getTrack(id);
   if (!tr) {
@@ -1043,7 +1207,6 @@ async function playSuggestion(vid) {
   await refresh();                                          // moves it into "Saved" with a download badge
   if (!tr.cached) enqueue(id, true);                        // download this one first
   requestPersist();
-  window.scrollTo(0, 0);
   await loadTrack(id, true);                                // streams now; switches to the phone copy when saved
   fetchThumb(id, vid);
 }
@@ -1258,7 +1421,7 @@ function removeTrack(id) {
   if (!confirm(T.confirmDel)) return;
   if (P.id === id) {
     stopCurrent(false); P.id = null; P.token++;
-    $('#np').hidden = true; $('#npEmpty').hidden = false; lsSet('last', '');
+    hideNP(); lsSet('last', '');
     updateUI(); updateTime();
   }
   cancelDl(id);
@@ -1270,7 +1433,7 @@ $('#playBtn').addEventListener('click', function () { isPlaying() ? doPause() : 
 $('#backBtn').addEventListener('click', function () { seekBy(-15); });
 $('#fwdBtn').addEventListener('click', function () { seekBy(15); });
 $('#fsBtn').addEventListener('click', function () { if (videoEl.requestFullscreen) videoEl.requestFullscreen().catch(function () {}); });
-$('#seek').addEventListener('input', function () { seeking = true; $('#cur').textContent = fmt(+this.value); });
+$('#seek').addEventListener('input', function () { seeking = true; updateTime(); });
 $('#seek').addEventListener('change', function () { seeking = false; seekTo(+this.value); });
 $('#saveLocalBtn').addEventListener('click', saveLocalFile);
 // Admin wiring
@@ -1319,7 +1482,7 @@ $('#list').addEventListener('click', function (e) {
   var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
   if (act === 'play') {
     if (P.id === id && P.mode) { isPlaying() ? doPause() : doPlay(); return; }
-    loadTrack(id, true); window.scrollTo(0, 0);
+    loadTrack(id, true);
   } else if (act === 'del') removeTrack(id);
   else if (act === 'retry') { DL.tries[id] = 0; delete dlState[id]; renderList(); enqueue(id); }
 });
@@ -1363,19 +1526,31 @@ window.addEventListener('online', function () {
 function saveNow() { if (P.id && P.mode) savePos(P.id, curTime()); }
 document.addEventListener('visibilitychange', function () {
   if (document.hidden) saveNow();
-  else { if (Date.now() - SYNC.last > 5 * 60e3) syncCatalog(); loadSuggestions(); }
+  else { resumeDownloads(); if (Date.now() - SYNC.last > 5 * 60e3) syncCatalog(); loadSuggestions(); }
 });
 window.addEventListener('pagehide', saveNow);
 
 // Install button
 var deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredPrompt = e; $('#installBtn').hidden = false; });
-window.addEventListener('appinstalled', function () { deferredPrompt = null; $('#installBtn').hidden = true; requestPersist(); });
+function installDismissed() { return Date.now() - Number(lsGet('installHidden') || 0) < 3 * 86400e3; }   // ✕ hides it for 3 days
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault(); deferredPrompt = e;
+  $('#installCard').hidden = installDismissed();
+});
+window.addEventListener('appinstalled', function () { deferredPrompt = null; $('#installCard').hidden = true; requestPersist(); });
 $('#installBtn').addEventListener('click', function () {
   if (!deferredPrompt) return;
   deferredPrompt.prompt();
-  deferredPrompt.userChoice.finally(function () { deferredPrompt = null; $('#installBtn').hidden = true; requestPersist(); });
+  deferredPrompt.userChoice.finally(function () { deferredPrompt = null; $('#installCard').hidden = true; requestPersist(); });
 });
+$('#installDismiss').addEventListener('click', function () { lsSet('installHidden', String(Date.now())); $('#installCard').hidden = true; });
+
+// Local file import (tucked under the saved list)
+$('#addLocalBtn').addEventListener('click', function () { $('#localPanel').hidden = false; this.hidden = true; });
+$('#localCancel').addEventListener('click', function () {
+  $('#localPanel').hidden = true; $('#addLocalBtn').hidden = false; $('#file').value = '';
+});
+window.addEventListener('resize', setPh);
 
 // Service worker (app shell offline)
 if ('serviceWorker' in navigator) {
@@ -1390,7 +1565,7 @@ route();
 refresh().then(function () {
   requestPersist();
   var last = lsGet('last'), tr = last && findTrack(last);
-  if (tr) { P.id = tr.id; showNP(tr); $('#cur').textContent = fmt(tr.position); updateUI(); }   // one tap to resume
+  if (tr) { P.id = tr.id; showNP(tr); updateUI(); updateTime(); }   // player ready: one tap to resume
   syncCatalog();                                // background: new talks from the admin catalog
   loadSuggestions();                            // online-only feed (metadata only)
 }).catch(function () { toast('IndexedDB error'); });

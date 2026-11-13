@@ -38,7 +38,7 @@ Grandma never pastes links. Her screen shows only large talk cards, each with a 
    - Leave the monk empty and the server uses the YouTube channel name.
 4. Tap **➕ Catalog သို့ ထည့်မည်**. The server starts preparing the file straight away.
 
-Her phone fetches `/api/catalog` each time the app opens, when the internet comes back, and when the app returns to the screen (at most every 5 minutes). New talks are queued and downloaded **strictly one at a time**, each in 2 MB pieces that are released after saving.
+Her phone fetches `/api/catalog` each time the app opens, when the internet comes back, and when the app returns to the screen (at most every 5 minutes). New talks are queued and downloaded **strictly one at a time**, each in 1 MB pieces that are released after saving.
 
 **When you remove a talk from the catalog:**
 - If it is already on her phone, it is **kept** and stays playable. It is marked *(Catalog မှ ဖယ်ထားသည်)*, but only in the admin view.
@@ -71,7 +71,7 @@ When the phone is online, her main screen has two sections:
 
 **Nothing in the suggestions is downloaded until she taps one.** On a tap:
 - It starts streaming from YouTube straight away.
-- Its audio (~22 MB/hour) goes to the **front** of the download queue. If a catalog download is running, it is paused and later resumes from its last saved 2 MB piece, so there is still only one download at a time.
+- Its audio (~22 MB/hour) goes to the **front** of the download queue. If a catalog download is running, it is paused and later resumes from its last saved 1 MB piece, so there is still only one download at a time.
 - When the download finishes, playback switches to the phone copy at the same second, and the talk moves into *Saved Offline* for good.
 
 **Managing sources** (in `#admin`, under *✨ Suggestion sources*):
@@ -107,14 +107,14 @@ When the phone is online, her main screen has two sections:
 | Internet drops while YouTube is playing | Iframe is removed at once; the local file continues from the same second (if not saved yet, it shows a message and resumes saving when back online) |
 
 Steps taken to keep memory low:
-- Downloads are streamed and written to IndexedDB in **2 MB pieces**, so the whole file is never held in RAM. Each buffer is released right after it is saved.
+- Downloads are streamed and written to IndexedDB in **1 MB pieces**, so the whole file is never held in RAM. Each buffer is released right after it is saved.
 - For playback, the pieces are joined with `new Blob([...pieces])`. Chrome keeps IndexedDB blobs on disk, so this does not copy the file into memory.
 - The previous blob URL is always released with `URL.revokeObjectURL()`, and the media element is reset with `removeAttribute('src')` + `load()` to free its decoder buffers.
 - The YouTube script is loaded only when needed, never offline.
 - No animations, shadows or blur.
 
 Other behaviour:
-- **Interrupted downloads resume** with HTTP `Range` from the last saved piece.
+- **Interrupted downloads resume** with HTTP `Range` from the last saved piece. If no data arrives for 30 seconds (mobile connections often hang silently), the download is aborted and resumed automatically; it keeps retrying as long as each try saves some data.
 - The last position of each talk is saved, and lock-screen controls work through the Media Session API.
 
 ## Run locally
