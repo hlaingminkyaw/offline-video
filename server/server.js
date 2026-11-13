@@ -52,11 +52,13 @@ const ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
   : '*';
 const ADMIN_PIN = String(process.env.ADMIN_PIN || '1234');
-// Hugging Face persistent storage is mounted at /data – use it automatically when present.
-const CATALOG_FILE = process.env.CATALOG_FILE || (() => {
-  try { fs.accessSync('/data', fs.constants.W_OK); return '/data/catalog.json'; }
-  catch { return path.join(__dirname, 'data', 'catalog.json'); }
+// Where catalog.json and sources.json live. DATA_DIR wins (e.g. a Docker volume mounted at /data);
+// otherwise /data is used automatically when writable (Hugging Face persistent storage), else server/data.
+const DATA_DIR = process.env.DATA_DIR || (() => {
+  try { fs.accessSync('/data', fs.constants.W_OK); return '/data'; }
+  catch { return path.join(__dirname, 'data'); }
 })();
+const CATALOG_FILE = process.env.CATALOG_FILE || path.join(DATA_DIR, 'catalog.json');
 const CATALOG_SEED = path.join(__dirname, 'catalog.seed.json');
 const SOURCES_FILE = process.env.SOURCES_FILE || path.join(path.dirname(CATALOG_FILE), 'sources.json');
 const SOURCES_SEED = path.join(__dirname, 'sources.seed.json');
