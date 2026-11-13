@@ -143,6 +143,19 @@ Free Render instances sleep after about 15 minutes idle. The first YouTube downl
 2. Upload or push all files in this folder. The front-matter at the top of this README already sets `sdk: docker` and `app_port: 7860`.
 3. Open `https://<user>-<space>.hf.space`.
 
+### Your own VPS (Ubuntu/Debian) — recommended if you have one
+The catalog is stored permanently and nothing goes to sleep. As root on the server:
+```bash
+curl -fsSL https://raw.githubusercontent.com/hlaingminkyaw/offline-video/main/deploy/setup-vps.sh -o setup-vps.sh
+bash setup-vps.sh
+```
+- It asks for an Admin PIN, then installs everything under `/opt/offline-video`. It uses its own Node.js copy, so other apps on the server are not affected.
+- The app runs as the systemd service `offline-video`, bound to `127.0.0.1`. HTTPS comes from Caddy, or from nginx/Apache + certbot if one of them already uses port 80/443.
+- Without a domain it uses `https://<ip-with-dashes>.sslip.io`. To use your own: `DOMAIN=dhamma.example.com bash setup-vps.sh`.
+- Settings live in `/etc/offline-video.env`; logs: `journalctl -u offline-video -f`.
+- Run the same command again to update.
+- Ports 80 and 443 must be open in the cloud provider's firewall.
+
 ### Hosting the PWA somewhere else (GitHub Pages, Netlify…)
 Upload `public/`. Then either set `DEFAULT_API` at the top of the `<script>` in `index.html`, or enter the server URL in the app under **⚙ ဆက်တင်**. CORS is enabled.
 

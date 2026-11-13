@@ -606,8 +606,10 @@ if (fs.existsSync(PUBLIC_DIR)) {
   }));
 }
 
-app.listen(PORT, () => {
-  console.log(`Dhamma server on :${PORT}  (yt-dlp: ${YTDLP}, tmp: ${TMP})`);
+// HOST=127.0.0.1 keeps the port private when a reverse proxy (Caddy/nginx) sits in front.
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`Dhamma server on ${HOST}:${PORT}  (yt-dlp: ${YTDLP}, tmp: ${TMP})`);
   console.log(`Catalog: ${CATALOG_FILE} (${catalog.length} talks)`);
   if (!process.env.ADMIN_PIN) console.warn('⚠ ADMIN_PIN not set – using default "1234". Set it before deploying!');
 });
