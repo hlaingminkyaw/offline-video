@@ -13,6 +13,8 @@ pinned: false
 An offline-first PWA for listening to Dhamma talks during power and internet cuts.
 It is plain HTML, CSS and JavaScript with no frameworks, built for an Android 10 phone with 2 GB of RAM.
 
+ရေးသားသူ (Author): **လှိုင်မင်းကျော် (Hlaing Min Kyaw)**
+
 ```
 public/            ← the PWA (can be hosted anywhere over HTTPS)
   index.html       ← whole app (UI + IndexedDB + player + downloader)
