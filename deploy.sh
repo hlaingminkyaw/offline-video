@@ -77,7 +77,10 @@ docker run -d --name dhamma-app --restart unless-stopped \
   --env-file /etc/dhamma-app.env \
   --memory 1g \
   dhamma-app >/dev/null
-docker image prune -f --filter label=app=dhamma-app >/dev/null
+# keep the disk small: drop dangling images and build cache
+docker image prune -f >/dev/null
+docker builder prune -f >/dev/null
+df -h / | awk 'NR==2{print "Disk: " $3 " used, " $4 " free (" $5 ")"}'
 
 for i in $(seq 1 60); do
   curl -fsS http://127.0.0.1:7860/health >/dev/null 2>&1 && break

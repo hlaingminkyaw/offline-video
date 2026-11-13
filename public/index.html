@@ -151,7 +151,7 @@
   <h1 id="appTitle">☸ ဓမ္မ နားထောင်ရန်</h1>
   <div id="badge" class="badge warn">⏳ ပြင်ဆင်နေသည်…</div>
   <div id="net" class="net"></div>
-  <button id="installBtn" class="btn light small" hidden>📲 ဖုန်း Home Screen သို့ ထည့်မည် (Install App)</button>
+  <button id="installBtn" class="btn" hidden>📲 ဖုန်းထဲသို့ App အဖြစ် သွင်းမည်</button>
 </header>
 
 <main>
@@ -1370,6 +1370,7 @@ window.addEventListener('pagehide', saveNow);
 // Install button
 var deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredPrompt = e; $('#installBtn').hidden = false; });
+window.addEventListener('appinstalled', function () { deferredPrompt = null; $('#installBtn').hidden = true; requestPersist(); });
 $('#installBtn').addEventListener('click', function () {
   if (!deferredPrompt) return;
   deferredPrompt.prompt();

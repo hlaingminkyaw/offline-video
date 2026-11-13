@@ -1,16 +1,32 @@
 /* Dhamma Player service worker – caches the app shell so the app opens with no internet.
    Media files are NOT cached here; they live in IndexedDB (see index.html). */
-const VERSION = 'v6';
+const VERSION = 'v7';
 const SHELL_CACHE = 'dhamma-shell-' + VERSION;
 const FONT_CACHE = 'dhamma-fonts-v1';
 const SHELL = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 const SHELL_PATHS = new Set(SHELL.map(p => new URL(p, self.location).pathname));
+const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;700&display=swap';
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(SHELL_CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(SHELL_CACHE)
+      .then(c => c.addAll(SHELL))                    // fails loudly if any shell file is missing
+      .then(() => precacheFont().catch(() => {}))    // best effort: never blocks install
+      .then(() => self.skipWaiting())
   );
 });
+
+// Burmese font CSS + its font files, so the first offline launch already has proper Myanmar text.
+async function precacheFont() {
+  const cache = await caches.open(FONT_CACHE);
+  if (await cache.match(FONT_CSS, { ignoreVary: true })) return;
+  const res = await fetch(FONT_CSS);
+  if (!res.ok) return;
+  const css = await res.clone().text();
+  const urls = [...css.matchAll(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g)].map(m => m[1]);
+  await Promise.all(urls.map(u => fetch(u).then(r => r.ok && cache.put(u, r))));
+  await cache.put(FONT_CSS, res);
+}
 
 self.addEventListener('activate', e => {
   e.waitUntil(

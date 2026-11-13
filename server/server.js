@@ -42,7 +42,13 @@ const TMP = process.env.DOWNLOAD_DIR || path.join(os.tmpdir(), 'dhamma-dl');
 const PUBLIC_DIR = process.env.PUBLIC_DIR || path.join(__dirname, '..', 'public');
 const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT) || 2;
 const MAX_JOBS = Number(process.env.MAX_JOBS) || 40;
-const FILE_TTL_MS = (Number(process.env.FILE_TTL_MIN) || 180) * 60e3;
+// Temp-file housekeeping:
+//  - a finished file is deleted DELIVERED_GRACE after the phone has received its last byte
+//  - a file nobody has requested for FILE_TTL_MIN (default 30) minutes is deleted
+//    (the phone pauses/resumes downloads with HTTP Range, so a disconnect alone must not delete it)
+//  - stray files in DOWNLOAD_DIR that belong to no job are deleted once older than FILE_TTL_MIN
+const FILE_TTL_MS = (Number(process.env.FILE_TTL_MIN) || 30) * 60e3;
+const DELIVERED_GRACE_MS = (Number(process.env.DELIVERED_GRACE_SEC) || 120) * 1e3;
 const JOB_TIMEOUT_MS = (Number(process.env.JOB_TIMEOUT_MIN) || 40) * 60e3;
 // yt-dlp needs a JS runtime for YouTube. Node is already here, so use it.
 // Set YTDLP_JS_RUNTIME="" to disable (for very old yt-dlp versions).
@@ -137,7 +143,7 @@ function publicJob(j) {
 
 function removeJob(j) {
   if (j.proc) { try { j.proc.kill('SIGKILL'); } catch {} }
-  if (j.file) fs.rm(j.file, { force: true }, () => {});
+  try { if (j.file) fs.rmSync(j.file, { force: true }); removeJobFiles(j.id); } catch {}   // file + .part / fragment leftovers
   jobs.delete(j.id);
   if (byKey.get(j.key) === j.id) byKey.delete(j.key);
 }
@@ -154,6 +160,7 @@ function startJob(vid, type) {
     id: `${key}-${crypto.randomBytes(4).toString('hex')}`,
     key, vid, type: t, status: 'queued', progress: 0,
     created: Date.now(), finished: 0, file: null, proc: null,
+    lastAccess: Date.now(), active: 0, delivered: 0,
   };
   jobs.set(job.id, job);
   byKey.set(key, job.id);
@@ -230,8 +237,7 @@ function runJob(job) {
       const lines = errTail.split('\n').filter(l => /ERROR/.test(l));
       job.error = job.error || (lines.pop() || `yt-dlp exited with code ${code}`).replace(/^.*?ERROR:\s*/, '').slice(0, 300);
       console.warn(`[error] ${job.id}: ${job.error}`);
-      // remove leftovers
-      for (const f of fs.readdirSync(TMP)) if (f.startsWith(job.id + '.')) fs.rm(path.join(TMP, f), { force: true }, () => {});
+      removeJobFiles(job.id);   // delete partial downloads right away
       resolve();
     };
     proc.on('error', err => { job.error = 'yt-dlp not found: ' + err.message; finish(-1); });
@@ -239,13 +245,35 @@ function runJob(job) {
   });
 }
 
-// Delete old files every 10 minutes (free hosts have small disks).
-setInterval(() => {
+function removeJobFiles(prefix) {
+  for (const f of fs.readdirSync(TMP)) if (f.startsWith(prefix + '.')) fs.rmSync(path.join(TMP, f), { recursive: true, force: true });
+}
+
+// Housekeeping: delivered files, idle files and orphans (small VPS disks).
+function sweep() {
   const now = Date.now();
   for (const j of jobs.values()) {
-    if (j.finished && now - j.finished > FILE_TTL_MS) removeJob(j);
+    if (j.proc || j.active > 0) continue;                       // still downloading from YouTube / still streaming
+    const idle = now - Math.max(j.lastAccess, j.finished || 0);
+    if (j.status === 'error' && idle > FILE_TTL_MS) { removeJob(j); continue; }
+    if (j.delivered && idle > DELIVERED_GRACE_MS) {
+      console.log(`[clean] ${j.id} delivered`); removeJob(j);
+    } else if (j.finished && idle > FILE_TTL_MS) {
+      console.log(`[clean] ${j.id} idle ${Math.round(idle / 60e3)} min`); removeJob(j);
+    }
   }
-}, 10 * 60e3).unref();
+  // orphans: files whose job is gone (e.g. evicted, crashed process)
+  const live = [...jobs.keys()];
+  for (const f of fs.readdirSync(TMP)) {
+    if (f === '.cache' || live.some(id => f.startsWith(id + '.'))) continue;
+    const full = path.join(TMP, f);
+    try {
+      const st = fs.statSync(full);
+      if (now - st.mtimeMs > FILE_TTL_MS) { fs.rmSync(full, { recursive: true, force: true }); console.log(`[clean] orphan ${f}`); }
+    } catch {}
+  }
+}
+setInterval(sweep, Math.min(60e3, FILE_TTL_MS / 2, DELIVERED_GRACE_MS)).unref();
 
 // ---------- app ----------
 const app = express();
@@ -276,7 +304,18 @@ app.get('/api/status/:id', (req, res) => {
 app.get('/api/file/:id', (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job || job.status !== 'ready' || !job.file) return res.status(404).json({ error: 'not ready' });
-  job.finished = Date.now(); // keep file alive while the phone is still downloading
+  job.lastAccess = Date.now(); // keep file alive while the phone is still downloading
+  job.active++;
+  // Does this request reach the end of the file? (no Range, or Range ending at the last byte)
+  const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+  const toEnd = !m || !m[2] || Number(m[2]) >= job.size - 1;
+  let done = false;
+  res.on('finish', () => { if (toEnd) job.delivered = Date.now(); });   // phone has the last byte
+  res.on('close', () => {                                               // finished OR client disconnected
+    if (done) return; done = true;
+    job.active = Math.max(0, job.active - 1);
+    job.lastAccess = Date.now();   // partial: kept for HTTP Range resume, removed after FILE_TTL_MIN idle
+  });
   res.setHeader('Content-Type', job.mime);
   res.setHeader('Cache-Control', 'no-store');
   res.sendFile(job.file, { acceptRanges: true }, err => {

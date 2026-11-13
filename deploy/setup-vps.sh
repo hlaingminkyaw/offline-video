@@ -121,10 +121,9 @@ YTDLP_PATH=$BASE/bin/yt-dlp
 DOWNLOAD_DIR=$BASE/tmp
 CATALOG_FILE=$BASE/data/catalog.json
 SOURCES_FILE=$BASE/data/sources.json
-# Small server: one yt-dlp job at a time, keep cached files 2 hours
+# Small server: one yt-dlp job at a time
 MAX_CONCURRENT=1
 MAX_JOBS=10
-FILE_TTL_MIN=120
 # YTDLP_COOKIES_FILE=$BASE/data/cookies.txt
 EOF
   chmod 600 "$ENV_FILE"
