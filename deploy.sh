@@ -30,7 +30,8 @@ rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
   ./ "$HOST:$APP_DIR/"
 
 echo "==> Building and starting on the server"
-ssh "${SSH_OPTS[@]}" "$HOST" bash -s -- "$ADMIN_PIN" "$DOMAIN" "$APP_DIR" "$DATA_DIR" <<'REMOTE'
+RC=0
+ssh "${SSH_OPTS[@]}" "$HOST" bash -s -- "$ADMIN_PIN" "$DOMAIN" "$APP_DIR" "$DATA_DIR" <<'REMOTE' || RC=$?
 set -euo pipefail
 PIN="$1"; DOMAIN="$2"; APP_DIR="$3"; DATA_DIR="$4"
 say()  { printf '\n\033[1;32m==> %s\033[0m\n' "$*"; }
@@ -147,6 +148,21 @@ warn "HTTPS not answering yet. Check: journalctl -u caddy -n 30 --no-pager"
 warn "and make sure TCP 80 and 443 are open in your VPS provider's firewall."
 exit 4
 REMOTE
+
+if [ "$RC" = 3 ]; then
+  # Nginx Proxy Manager owns 80/443 and has no site for us yet: add it through its API (on the server)
+  echo
+  echo "==> Adding $DOMAIN to Nginx Proxy Manager automatically"
+  echo "    Enter the login you use at http://<server>:81 (sent over SSH only, not saved)."
+  [ -n "${NPM_USER:-}" ] || read -rp "    NPM email: " NPM_USER
+  [ -n "${NPM_PASS:-}" ] || { read -rsp "    NPM password: " NPM_PASS; echo; }
+  printf '%s\n%s\n' "$NPM_USER" "$NPM_PASS" \
+    | ssh "${SSH_OPTS[@]}" "$HOST" python3 "$APP_DIR/deploy/npm_proxy.py" "$DOMAIN" dhamma-app 7860 \
+    || { echo "⚠ Automatic setup failed – use the manual steps printed above."; exit 1; }
+  sleep 3
+elif [ "$RC" != 0 ]; then
+  exit "$RC"
+fi
 
 echo "==> Checking from this Mac"
 if curl -fsS --max-time 15 "https://$DOMAIN/health"; then

@@ -263,7 +263,8 @@
 'use strict';
 /* ===================== Config & text ===================== */
 // Put your backend URL here (or set it in ⚙ Settings). '' = same server that serves this page.
-var DEFAULT_API = '';
+// On Vercel (no yt-dlp there) the page uses the VPS backend; everywhere else the same server.
+var DEFAULT_API = /\.vercel\.app$/.test(location.hostname) ? 'https://150.95.27.200.sslip.io' : '';
 var CHUNK = 2 * 1024 * 1024;   // downloads are saved in 2 MB pieces -> RAM never holds the whole file
 
 var T = {
