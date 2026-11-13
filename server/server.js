@@ -50,6 +50,8 @@ const MAX_JOBS = Number(process.env.MAX_JOBS) || 40;
 const FILE_TTL_MS = (Number(process.env.FILE_TTL_MIN) || 30) * 60e3;
 const DELIVERED_GRACE_MS = (Number(process.env.DELIVERED_GRACE_SEC) || 120) * 1e3;
 const JOB_TIMEOUT_MS = (Number(process.env.JOB_TIMEOUT_MIN) || 40) * 60e3;
+// Hard limit: nothing in DOWNLOAD_DIR (media files, yt-dlp cache) is kept longer than this, no matter what.
+const MAX_FILE_AGE_MS = (Number(process.env.MAX_FILE_AGE_DAYS) || 14) * 86400e3;
 // yt-dlp needs a JS runtime for YouTube. Node is already here, so use it.
 // Set YTDLP_JS_RUNTIME="" to disable (for very old yt-dlp versions).
 const JS_RUNTIME = process.env.YTDLP_JS_RUNTIME ?? 'node';
@@ -250,9 +252,12 @@ function removeJobFiles(prefix) {
 }
 
 // Housekeeping: delivered files, idle files and orphans (small VPS disks).
+let cacheClearedAt = Date.now();   // TMP is wiped at start-up, so the cache is fresh now
 function sweep() {
   const now = Date.now();
   for (const j of jobs.values()) {
+    // Hard limit: even a "busy" job (e.g. a stuck connection that never closed) goes after MAX_FILE_AGE.
+    if (now - j.created > MAX_FILE_AGE_MS) { console.log(`[clean] ${j.id} max age`); removeJob(j); continue; }
     if (j.proc || j.active > 0) continue;                       // still downloading from YouTube / still streaming
     const idle = now - Math.max(j.lastAccess, j.finished || 0);
     if (j.status === 'error' && idle > FILE_TTL_MS) { removeJob(j); continue; }
@@ -265,7 +270,14 @@ function sweep() {
   // orphans: files whose job is gone (e.g. evicted, crashed process)
   const live = [...jobs.keys()];
   for (const f of fs.readdirSync(TMP)) {
-    if (f === '.cache' || live.some(id => f.startsWith(id + '.'))) continue;
+    if (f === '.cache') {                                         // yt-dlp's small cache: wipe it every MAX_FILE_AGE
+      if (now - cacheClearedAt > MAX_FILE_AGE_MS && running === 0) {
+        cacheClearedAt = now;
+        try { fs.rmSync(path.join(TMP, f), { recursive: true, force: true }); console.log('[clean] yt-dlp cache'); } catch {}
+      }
+      continue;
+    }
+    if (live.some(id => f.startsWith(id + '.'))) continue;
     const full = path.join(TMP, f);
     try {
       const st = fs.statSync(full);
@@ -284,7 +296,18 @@ app.use(cors({
   maxAge: 86400,
 }));
 
-app.get('/health', (req, res) => res.json({ ok: true, jobs: jobs.size, running }));
+function dirBytes(dir) {
+  let n = 0;
+  try {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      n += e.isDirectory() ? dirBytes(p) : fs.statSync(p).size;
+    }
+  } catch {}
+  return n;
+}
+// tempMB = how much disk the temporary download files use right now (should stay near 0 when idle).
+app.get('/health', (req, res) => res.json({ ok: true, jobs: jobs.size, running, tempMB: +(dirBytes(TMP) / 1048576).toFixed(1) }));
 
 app.post('/api/prepare', express.json({ limit: '2kb' }), (req, res) => {
   const { url, type } = req.body || {};

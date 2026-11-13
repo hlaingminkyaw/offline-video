@@ -85,8 +85,8 @@
                 background: rgba(30, 27, 24, .78); color: #fff; font-size: .7rem; display: grid; place-items: center; }
   .item.current .art .state { background: var(--pri); }
   .item-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-  .item-text b { font-size: 1.02rem; line-height: 1.5; word-break: break-word;
-                 display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .item-text b { font-size: 1.02rem; line-height: 1.55; word-break: break-word;
+                 display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .item-text .who { font-size: .88rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
   .pill { display: inline-flex; align-items: center; padding: 1px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700;
@@ -104,8 +104,9 @@
   .item-actions { display: flex; gap: 8px; padding: 0 14px 14px; justify-content: flex-end; }
   .item-actions .btn { width: auto; min-height: 48px; margin: 0; padding: 4px 16px; font-size: .9rem; }
   .item .admin-only { font-size: .8rem; color: var(--muted); }
-  /* Grandma view: no retry/technical details */
-  body:not(.admin) .item-actions, body:not(.admin) .admin-only { display: none !important; }
+  /* Grandma view: no delete / retry / technical details / English labels, so cards get the full width */
+  body:not(.admin) .item-actions, body:not(.admin) .admin-only, body:not(.admin) .del, body:not(.admin) .h-en { display: none !important; }
+  body:not(.admin) .item-main { padding-right: 16px; }
 
   /* Suggested talks: 16:9 thumbnails */
   #sugList .item-main { padding: 12px; gap: 12px; }
@@ -235,7 +236,7 @@
 
 <main>
   <section id="admin" hidden>
-    <button id="homeBtn" class="btn light">← အဘွားမျက်နှာပြင်သို့ ပြန်သွားမည် (Exit Admin)</button>
+    <button id="homeBtn" class="btn light">← ပင်မ စာမျက်နှာသို့ ပြန်သွားမည်</button>
     <div class="card">
       <h2>🔐 Admin – Remote Catalog</h2>
       <div id="pinBox">
@@ -265,7 +266,7 @@
         <p id="catInfo" class="hint"></p>
 
         <h3>✨ အကြံပြုချက် ရင်းမြစ်များ (Suggestion sources)</h3>
-        <p class="hint">ဤနေရာမှ တရားများကို မဒေါင်းပါ — အဖွားက နှိပ်ဖွင့်မှသာ ဖုန်းထဲ သိမ်းပါမည်။</p>
+        <p class="hint">ဤနေရာမှ တရားများကို မဒေါင်းပါ — နားထောင်သူက နှိပ်ဖွင့်မှသာ ဖုန်းထဲ သိမ်းပါမည်။</p>
         <label>Channel / Playlist URL သို့မဟုတ် ရှာမည့်စကားလုံး
           <input id="sUrl" type="text" autocomplete="off" placeholder="ytsearch8:မိုးကုတ်ဆရာတော် တရားတော်">
         </label>
@@ -378,10 +379,11 @@ var CHUNK = 1024 * 1024;       // downloads are saved in 1 MB pieces -> RAM neve
 var STALL_MS = 30000;          // no bytes for this long = dead connection (mobile networks often hang silently)
 
 var T = {
-  ready: '🟢 Offline Ready', online: '📶 Online', offlineShort: '📴 Offline',
+  ready: '✓ အင်တာနက်မလို', online: '📶 အွန်လိုင်း', offlineShort: '📴 အော့ဖ်လိုင်း',
   offline: '📴 အင်တာနက် မရှိပါ — ဖုန်းထဲက တရားများ ဖွင့်နိုင်သည်',
   play: 'ဖွင့်မည်', pause: 'ခဏရပ်မည်',
-  cached: 'Offline Ready ✓',
+  cached: '✓ ဖုန်းထဲ ရှိပြီး',
+  cachedToast: '✓ ဖုန်းထဲ သိမ်းပြီးပါပြီ',
   onlineOnly: '🌐 အင်တာနက်ဖြင့်သာ ဖွင့်နိုင်သေးသည်',
   queued: '⏳ ဒေါင်းလုဒ်ဆွဲရန် စောင့်နေသည်',
   waitNet: '📴 အင်တာနက် ပြန်ရလျှင် ဆက်ဒေါင်းမည်',
@@ -608,8 +610,9 @@ function renderList() {
       '<span class="item-text"><b>' + (t.kind === 'video' ? '🎬 ' : '') + esc(t.title) + '</b>' +
       (t.monk ? '<span class="who">' + esc(t.monk) + '</span>' : '') +
       '<span class="badges">' + statusHtml(t) +
-      (t.duration ? '<span class="pill meta">⏱ ' + fmt(t.duration) + '</span>' : '') +
-      (t.size && t.cached ? '<span class="pill meta">' + mb(t.size) + ' MB</span>' : '') +
+      (t.duration || (t.size && t.cached) ? '<span class="pill meta">' +   // one pill: "⏱ 40:00 · 14 MB"
+        [t.duration ? '⏱ ' + fmt(t.duration) : '', t.size && t.cached ? Math.round(t.size / 1048576) + ' MB' : '']
+          .filter(Boolean).join(' · ') + '</span>' : '') +
       (t.position > 5 && !pct ? '<span class="pill meta">' + T.stoppedAt + fmt(t.position) + '</span>' : '') +
       '</span>' +
       (s && s.detail ? '<span class="admin-only">' + esc(s.detail) + '</span>' : '') +
@@ -1088,7 +1091,7 @@ async function cacheYouTube(id) {
   await patch(id, { cached: true, mime: mime, dl: null, size: total || undefined });
   delete dlState[id];
   await refresh();
-  toast((findTrack(id) || {}).title + ' — ' + T.cached);
+  toast((findTrack(id) || {}).title + ' — ' + T.cachedToast);
   if (P.id === id) {
     if (P.mode === 'yt') switchYTtoLocal('ready');                  // lighter: drop the iframe
     else if (!P.mode && P.waitCache) { var t2 = await getTrack(id); playLocal(t2, t2.position || 0, true); }

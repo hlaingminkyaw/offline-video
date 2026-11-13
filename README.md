@@ -177,6 +177,7 @@ Size guide: audio is about 22 MB per hour (≈48 kbps AAC); 360p video is about 
 | `ALLOWED_ORIGINS` | `*` | Comma-separated list to restrict CORS |
 | `MAX_CONCURRENT` | 2 | Parallel yt-dlp jobs |
 | `FILE_TTL_MIN` | 30 | A server temp file nobody has requested for this long is deleted (paused phone downloads resume within this window). Files are also deleted 2 min after the phone receives the last byte, at once when yt-dlp fails, and stray files older than this are swept every minute |
+| `MAX_FILE_AGE_DAYS` | 14 | Hard limit: any temp file (and yt-dlp's cache) is deleted after this many days, even if a stuck connection still holds it. `GET /health` shows `tempMB`, the disk the temp files use right now |
 | `AUDIO_FORMAT` / `VIDEO_FORMAT` | see server.js | yt-dlp `-f` selectors |
 | `YTDLP_JS_RUNTIME` | `node` | JS runtime yt-dlp uses for YouTube; set to empty for old yt-dlp |
 | `YTDLP_EXTRA_ARGS` | – | Extra yt-dlp flags |
