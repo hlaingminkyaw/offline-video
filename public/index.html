@@ -170,6 +170,14 @@
   .np-art img { width: 100%; height: 100%; object-fit: cover; }
   .np-text { min-width: 0; flex: 1; }
   #npTitle { font-weight: 700; font-size: .95rem; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Long title: slides left to show the rest, pauses, slides back (only when it does not fit). */
+  #npTitle > span { display: inline-block; }
+  #npTitle.marq { text-overflow: clip;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 8px, #000 calc(100% - 14px), transparent);
+            mask-image: linear-gradient(to right, transparent, #000 8px, #000 calc(100% - 14px), transparent); }
+  #npTitle.marq > span { animation: marq var(--marq-t, 8s) ease-in-out 1s infinite alternate; }
+  @keyframes marq { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--marq-d, 0px)); } }
+  @media (prefers-reduced-motion: reduce) { #npTitle.marq { text-overflow: ellipsis; } #npTitle.marq > span { animation: none; } }
   #npMonk { font-size: .78rem; line-height: 1.4; color: #CDBFB1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #npMonk:empty { display: none; }
   .np-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 1px; }
@@ -359,7 +367,7 @@
     <div class="np-row">
       <div id="npArt" class="np-art">🎧</div>
       <div class="np-text">
-        <div id="npTitle"></div>
+        <div id="npTitle"><span></span></div>
         <div id="npMonk"></div>
         <div class="np-meta"><span id="npSrc" class="pill meta"></span><span id="npDl" class="pill dl" hidden></span></div>
       </div>
@@ -697,13 +705,13 @@ function setPh() {
 }
 function showNP(tr) {
   document.body.classList.add('has-player');
-  $('#npTitle').textContent = tr.title;
+  $('#npTitle > span').textContent = tr.title;
   $('#npMonk').textContent = tr.monk || '';
   $('#npArt').innerHTML = artHtml(tr);
   $('#npSrc').textContent = tr.cached ? T.srcLocal : '';
   $('#npSrc').hidden = !tr.cached;
   showDl();
-  setPh();
+  setPh(); fitTitle();
   if ('mediaSession' in navigator && window.MediaMetadata) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: tr.title, artist: tr.monk || '',
@@ -711,6 +719,17 @@ function showNP(tr) {
     });
   }
   markCurrent();
+}
+// Start the title scroll only if the title is wider than its box (about 30 px per second).
+function fitTitle() {
+  var box = $('#npTitle'), sp = box.firstChild;
+  box.classList.remove('marq');
+  var d = sp.scrollWidth - box.clientWidth;
+  if (d <= 4 || !document.body.classList.contains('has-player')) return;
+  box.style.setProperty('--marq-d', -d + 'px');
+  box.style.setProperty('--marq-t', Math.max(4, d / 30 / 0.7).toFixed(1) + 's');
+  void box.offsetWidth;            // restart the animation for a new title
+  box.classList.add('marq');
 }
 function hideNP() {
   document.body.classList.remove('has-player');
@@ -1701,7 +1720,8 @@ $('#addLocalBtn').addEventListener('click', function () { $('#localPanel').hidde
 $('#localCancel').addEventListener('click', function () {
   $('#localPanel').hidden = true; $('#addLocalBtn').hidden = false; $('#file').value = '';
 });
-window.addEventListener('resize', setPh);
+window.addEventListener('resize', function () { setPh(); fitTitle(); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTitle);   // Burmese font changes the width
 
 // Service worker (app shell offline)
 if ('serviceWorker' in navigator) {
