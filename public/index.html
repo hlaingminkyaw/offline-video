@@ -185,7 +185,7 @@
   .times { display: flex; justify-content: space-between; margin-top: -4px; font-size: .82rem; font-weight: 700;
            color: var(--muted); font-variant-numeric: tabular-nums; }
   .controls { display: flex; align-items: center; justify-content: center; gap: 26px; margin-top: 4px; }
-  .skip { width: 72px; height: 60px; border: 0; border-radius: 18px; background: var(--soft); color: var(--fg);
+  .skip { min-width: 72px; padding: 0 12px; white-space: nowrap; height: 60px; border: 0; border-radius: 18px; background: var(--soft); color: var(--fg);
           display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; transition: transform .1s; }
   .skip .i { font-size: 1.25rem; }
   .skip .t { font-size: .72rem; font-weight: 700; color: var(--muted); }
@@ -363,9 +363,9 @@
       <div class="times"><span id="cur">0:00</span><span id="dur">--:--</span></div>
     </div>
     <div class="controls">
-      <button id="backBtn" class="skip" disabled aria-label="၁၅ စက္ကန့် နောက်သို့"><span class="i">⏪</span><span class="t">၁၅ စက္ကန့်</span></button>
+      <button id="backBtn" class="skip" disabled aria-label="အရင်တစ်ပုဒ်"><span class="i">⏮</span><span class="t">အရင်တစ်ပုဒ်</span></button>
       <button id="playBtn" disabled aria-label="ဖွင့်မည်">▶</button>
-      <button id="fwdBtn" class="skip" disabled aria-label="၁၅ စက္ကန့် ရှေ့သို့"><span class="i">⏩</span><span class="t">၁၅ စက္ကန့်</span></button>
+      <button id="fwdBtn" class="skip" disabled aria-label="နောက်တစ်ပုဒ်"><span class="i">⏭</span><span class="t">နောက်တစ်ပုဒ်</span></button>
     </div>
   </div>
 </section>
@@ -633,6 +633,7 @@ function renderList() {
   }
   $('#list').innerHTML = html;
   $('#listEmpty').hidden = tracks.length > 0;
+  updateSkip();
 }
 
 // Cheap per-second/per-state update of the "now playing" highlight (no list re-render, no image re-decode).
@@ -1014,13 +1015,34 @@ function seekTo(t) {
 }
 function seekBy(d) { if (P.mode) seekTo(curTime() + d); }
 
+// Previous / next talk, in the same order as the list (newest first).
+// Offline: talks that are not on the phone yet are skipped.
+function neighbour(dir) {
+  var i = -1;
+  for (var k = 0; k < tracks.length; k++) if (tracks[k].id === P.id) { i = k; break; }
+  if (i < 0) return null;
+  for (var j = i + dir; j >= 0 && j < tracks.length; j += dir) {
+    var t = tracks[j];
+    if (t.cached || (navigator.onLine && t.source === 'youtube')) return t;
+  }
+  return null;
+}
+function updateSkip() {
+  $('#backBtn').disabled = !neighbour(-1);
+  $('#fwdBtn').disabled = !neighbour(1);
+}
+function playAdjacent(dir) {
+  var t = neighbour(dir);
+  if (t) loadTrack(t.id, true);
+}
+
 function updateUI() {
   var playing = isPlaying();
   var pb = $('#playBtn');
   pb.disabled = !P.id;
   pb.textContent = playing ? '⏸' : '▶';
   pb.setAttribute('aria-label', playing ? T.pause : T.play);
-  $('#backBtn').disabled = $('#fwdBtn').disabled = !P.mode;
+  updateSkip();
   $('#fsBtn').hidden = !(P.mode === 'media' && P.el === videoEl);
   $('#stage').hidden = $('#ytBox').hidden && videoEl.hidden;
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
@@ -1550,8 +1572,8 @@ function removeTrack(id) {
 
 /* ===================== Wiring ===================== */
 $('#playBtn').addEventListener('click', function () { isPlaying() ? doPause() : doPlay(); });
-$('#backBtn').addEventListener('click', function () { seekBy(-15); });
-$('#fwdBtn').addEventListener('click', function () { seekBy(15); });
+$('#backBtn').addEventListener('click', function () { playAdjacent(-1); });
+$('#fwdBtn').addEventListener('click', function () { playAdjacent(1); });
 $('#fsBtn').addEventListener('click', function () { if (videoEl.requestFullscreen) videoEl.requestFullscreen().catch(function () {}); });
 $('#seek').addEventListener('input', function () { seeking = true; updateTime(); });
 $('#seek').addEventListener('change', function () { seeking = false; seekTo(+this.value); });
@@ -1626,6 +1648,8 @@ if ('mediaSession' in navigator) {
     ms.setActionHandler('pause', doPause);
     ms.setActionHandler('seekbackward', function () { seekBy(-15); });
     ms.setActionHandler('seekforward', function () { seekBy(15); });
+    ms.setActionHandler('previoustrack', function () { playAdjacent(-1); });
+    ms.setActionHandler('nexttrack', function () { playAdjacent(1); });
   } catch (e) {}
 }
 
