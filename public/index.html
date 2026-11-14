@@ -106,7 +106,8 @@
   .item-actions .btn { width: auto; min-height: 48px; margin: 0; padding: 4px 16px; font-size: .9rem; }
   .item .admin-only { font-size: .8rem; color: var(--muted); }
   /* Grandma view: no delete / retry / technical details / English labels, so cards get the full width */
-  body:not(.admin) .item-actions, body:not(.admin) .admin-only, body:not(.admin) .del, body:not(.admin) .h-en { display: none !important; }
+  body:not(.admin) .item-actions, body:not(.admin) .admin-only, body:not(.admin) .del, body:not(.admin) .h-en,
+  body:not(.admin) #addLocalBtn, body:not(.admin) #localPanel { display: none !important; }
   body:not(.admin) .item-main { padding-right: 16px; }
 
   /* Suggested talks: 16:9 thumbnails */
